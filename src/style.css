@@ -302,3 +302,67 @@ button,.btn,.primary,.nav,.world-actions button,.layerbar button,.decision-grid 
   .content p,.panel p,.citybody p,.advisor p,.goal small,.history-card p,.newspaper p,.eventbig p{font-size:11.5px}
   .sectionhead h2,.panel h2{font-size:21px}
 }
+
+/* V6.5.2 — mobile nation identity / creator scaling */
+@media (max-width:680px){
+  .creator{
+    height:100%;
+    min-height:0;
+    overflow-y:auto;
+    overflow-x:hidden;
+    padding:18px 10px 28px;
+    display:block;
+    -webkit-overflow-scrolling:touch;
+  }
+  .creator-card{
+    width:100%;
+    max-width:620px;
+    margin:0 auto;
+    padding:20px 16px;
+    border-radius:14px;
+  }
+  .creator-head small{font-size:9px;line-height:1.3}
+  .creator-head h1{
+    font-size:clamp(27px,8vw,34px);
+    line-height:1.04;
+    letter-spacing:-.045em;
+    margin:7px 0 10px;
+  }
+  .creator-head p{font-size:12px;line-height:1.5;margin:0;max-width:none}
+  .presetrow{
+    margin:17px -2px 18px;
+    padding:2px;
+    gap:6px;
+    overflow-x:auto;
+    overscroll-behavior-x:contain;
+  }
+  .presetrow button{min-height:44px;padding:9px 12px;font-size:11px;flex:0 0 auto}
+  .creator-grid{gap:11px}
+  .creator-grid label,.slidergrid label{font-size:11px;line-height:1.35}
+  .creator-grid input,.creator-grid select{
+    margin-top:6px;
+    min-height:46px;
+    padding:11px 12px;
+    font-size:16px;
+    border-radius:8px;
+  }
+  .slidergrid{gap:14px;margin:20px 0}
+  .slidergrid span{font-size:11px;line-height:1.3}
+  .slidergrid span b{font-size:12px}
+  .slidergrid input{height:24px;margin-top:7px}
+  .creator-foot{gap:14px;padding-top:17px}
+  .creator-foot small{font-size:8px}
+  .creator-foot b{font-size:14px}
+  #forge-nation-btn{min-height:48px;font-size:12px;padding:12px 14px}
+}
+
+@media (max-width:390px){
+  .creator{padding:12px 8px 24px}
+  .creator-card{padding:18px 13px;border-radius:12px}
+  .creator-head h1{font-size:27px}
+  .creator-head p{font-size:11.5px}
+  .presetrow{margin-top:14px;margin-bottom:15px}
+  .creator-grid{gap:9px}
+  .slidergrid{gap:12px;margin:17px 0}
+  .creator-foot{gap:12px}
+}
