@@ -168,3 +168,9 @@ html,body{overflow:hidden;height:100%;overscroll-behavior:none}
 .decision-panel{position:relative}.decision-panel>div:first-child p{margin:6px 0 0;max-width:620px;font-size:9px;line-height:1.5;color:#7f9799}.decision-grid button{display:flex!important;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;min-height:66px!important;text-align:left}.decision-grid button strong{font-size:10px;color:#dceceb}.decision-grid button small{font:7px var(--font-data);color:#718a8d}.decision-grid button:hover:not(:disabled){border-color:rgba(140,229,232,.45);transform:translateY(-1px)}.decision-grid button:disabled{opacity:.34;cursor:not-allowed;filter:saturate(.45)}
 .neighbor-list button:disabled{opacity:.35;cursor:not-allowed}.project-strip span{position:relative}.project-strip span:after{content:"";display:block;height:3px;margin-top:5px;border-radius:99px;background:linear-gradient(90deg,var(--accent),rgba(140,229,232,.08));opacity:.65}
 @media(max-width:760px){.turn-banner{align-items:flex-start;flex-direction:column}.turn-stats{justify-content:flex-start}.turn-stats span{min-width:75px}.turn-banner h3{font-size:16px}}
+
+/* V6.2 — the map itself communicates national development. */
+.map-maturity{position:absolute;left:18px;bottom:18px;z-index:8;display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid rgba(184,215,204,.16);background:rgba(7,16,18,.72);backdrop-filter:blur(10px);font-size:10px;letter-spacing:.12em;color:#9eb3ad;pointer-events:none}
+.map-maturity span{opacity:.68}.map-maturity b{font-size:10px;color:#d9ebe5;min-width:112px}.map-maturity i{display:block;width:105px;height:3px;background:rgba(200,220,210,.14);overflow:hidden}.map-maturity em{display:block;width:0;height:100%;background:#9bcfc2;transition:width .6s ease}
+#scene[data-map-tier="FRONTIER"] .map-maturity em{opacity:.55}
+#scene[data-map-tier="MAJOR POWER"] .map-maturity em{box-shadow:0 0 12px rgba(155,207,194,.45)}

@@ -118,6 +118,9 @@ function derive(){
  };
  n.culture=n.culture||{creativity:clamp(n.edu*.55+n.tech*.2,0,100),participation:clamp(n.happiness*.55+n.urban*.25,0,100),prestige:clamp(n.edu*.2+n.tech*.3+n.approval*.15,0,100)};
  n.identity=n.identity||'Young Republic';
+ // Store the founding snapshot once so the 3D world can show development as growth,
+ // rather than treating the starting country as already fully built.
+ n.mapBase=n.mapBase||{year:state.year,population:n.population,infrastructure:n.infrastructure,urban:n.urban,industry:n.industry,energy:n.energy,education:n.edu,technology:n.tech,cities:n.cities.length};
  n.generation=n.generation||{number:1,label:'Founding Generation'};
  n.goals=n.goals||[{id:'prosperity',title:'Prosperous Nation',text:'Reach $100B GDP.',done:false},{id:'green',title:'Green Future',text:'Keep environment above 80.',done:false},{id:'knowledge',title:'Knowledge Nation',text:'Reach 85% education.',done:false},{id:'connected',title:'Connected Nation',text:'Reach 75 infrastructure.',done:false}];
  n.advisors=n.advisors||[
@@ -174,7 +177,7 @@ function createNation(){state.year=1;state.nation={name:create.name||'Aurelia',c
 function metric(label,value,sub=''){return `<div class="metric"><span>${label}</span><strong>${value}</strong>${sub?`<em>${sub}</em>`:''}</div>`}
 function top(){const n=state.nation;return `<header class="top"><div class="brand"><b>FORGE</b><span>A NATION</span></div><div class="yearbox"><small>YEAR</small><b>${state.year}</b><button data-action="advance">${state.playing?'Ⅱ':'▶'}</button></div><div class="topmetrics">${metric('POP',fmt(n.population/1e6)+'M','+0.3%')} ${metric('GDP',money(n.gdp),'+'+((n.gdp/Math.max(1,n.pop))/30).toFixed(1)+'%')} ${metric('APPROVAL',n.approval+'%','▲ stable')} ${metric('STABILITY',n.stability+'%','')} ${metric('ACTIONS',n.actionPoints+'/'+n.maxActions,'this year')}</div><button class="iconbtn" data-action="save">SAVE</button></header>`}
 function sidebar(){const items=[['overview','◈','Overview'],['map','⌁','World'],['cities','⌂','Cities'],['economy','◒','Economy'],['people','♙','People'],['government','♜','Politics'],['diplomacy','◎','Diplomacy'],['military','⚔','Military'],['development','⬡','Development'],['culture','✦','Culture'],['history','◷','History'],['missions','◇','Missions']];return `<aside class="sidebar"><div class="nation-mini"><div class="flag"></div><b>${state.nation.name}</b><span>${state.nation.government}</span></div>${items.map(x=>`<button class="nav ${state.view===x[0]?'active':''}" data-view="${x[0]}"><i>${x[1]}</i><span>${x[2]}</span></button>`).join('')}<div class="sidebottom"><button class="nav" data-action="features"><i>＋</i><span>Features</span></button><button class="nav" data-action="new"><i>↻</i><span>New nation</span></button></div></aside>`}
-function world(){return `<section class="world"><div class="world-head"><div><small>LIVE NATION</small><h1>${state.nation.name}</h1><p>${state.nation.terrain} · Year ${state.year}</p></div><div class="world-actions"><button data-action="camera">◎ HOME</button><button data-action="report">▣ YEAR REPORT</button></div></div><div id="scene"></div><div class="layerbar">${[['political','Political'],['population','Population'],['economy','Economy'],['resources','Resources'],['infrastructure','Infrastructure'],['environment','Environment'],['military','Military']].map(x=>`<button class="${state.layer===x[0]?'active':''}" data-layer="${x[0]}">${x[1]}</button>`).join('')}</div><div class="world-hint">CLICK A CITY · DRAG TO ROTATE · SCROLL TO DIVE · 1–7 CHANGE LAYERS</div><div class="mini-legend"><span>LOW</span><i></i><i></i><i></i><i></i><i></i><span>HIGH</span></div></section>`}
+function world(){return `<section class="world"><div class="world-head"><div><small>LIVE NATION</small><h1>${state.nation.name}</h1><p>${state.nation.terrain} · Year ${state.year}</p></div><div class="world-actions"><button data-action="camera">◎ HOME</button><button data-action="report">▣ YEAR REPORT</button></div></div><div id="scene"></div><div class="layerbar">${[['political','Political'],['population','Population'],['economy','Economy'],['resources','Resources'],['infrastructure','Infrastructure'],['environment','Environment'],['military','Military']].map(x=>`<button class="${state.layer===x[0]?'active':''}" data-layer="${x[0]}">${x[1]}</button>`).join('')}</div><div class="world-hint">CLICK A CITY · DRAG TO ROTATE · SCROLL TO DIVE · 1–7 CHANGE LAYERS</div><div class="map-maturity"><span>NATION BUILD</span><b id="map-maturity-value">YEAR ${state.year}</b><i><em id="map-maturity-bar"></em></i></div><div class="mini-legend"><span>LOW</span><i></i><i></i><i></i><i></i><i></i><span>HIGH</span></div></section>`}
 function overview(){const n=state.nation,p=activeProgression();return `<div class="panelgrid">${turnBanner()}<article class="panel hero"><small>NATIONAL SNAPSHOT</small><h2>${n.name}</h2><p>Your country is not a spreadsheet. Watch geography, people, cities and institutions react to your choices.</p><div class="identity-chip"><span>NATIONAL CHARACTER</span><b>${n.identity}</b><button data-explain="identity">?</button></div><div class="metricgrid">${metric('GDP',money(n.gdp),'annual output')} ${metric('INFLATION',n.inflation.toFixed(1)+'%','consumer prices')} ${metric('JOBS',n.jobs.toFixed(0)+'%','employment')} ${metric('HAPPINESS',n.happiness.toFixed(0)+'%','public mood')}</div></article><article class="panel progression"><small>NATION PROGRESSION</small><div class="levelrow"><div><b>LEVEL ${p.cur.level}</b><strong>${p.cur.name}</strong></div><span>${Math.round(n.xp)} XP${p.next?' / '+p.next.xp+' XP':''}</span></div><div class="xpbar"><i style="width:${p.pct}%"></i></div><p>${p.next?`Next: <b>${p.next.name}</b> — ${p.next.unlock}.`:'Maximum current level reached.'}</p><button class="explain-link" data-explain="xp">What does XP do?</button><div class="missionmini"><small>ACTIVE MISSIONS</small>${n.missions.filter(m=>!m.complete).slice(0,3).map(m=>`<div><b>${m.title}</b><span>+${m.reward} XP</span></div>`).join('')}</div></article><article class="panel"><small>WHAT IS HAPPENING</small>${n.event?`<div class="eventbig active-event"><b>${n.event.icon} ${n.event.title}</b><p>${n.event.text}</p><div class="event-actions"><button data-event-choice="invest">Invest to contain</button><button data-event-choice="restrict">Use emergency powers</button><button data-event-choice="wait">Wait it out</button></div></div>`:`<div class="eventbig"><b>${n.news[0].icon} ${n.news[0].title}</b><p>${n.news[0].text}</p></div>`}<div class="eventbig"><b>${n.news[1].icon} ${n.news[1].title}</b><p>${n.news[1].text}</p></div></article><article class="panel wide"><small>VISIBLE CONSEQUENCES</small><div class="consequence-row"><div><b>🏙️</b><strong>${n.cities.length} cities</strong><span>urban network</span></div><div><b>🏭</b><strong>${Math.round(n.industry*1.7)} industry</strong><span>production base</span></div><div><b>🌾</b><strong>${Math.round(n.agri)} agriculture</strong><span>food capacity</span></div><div><b>🌳</b><strong>${n.environment}%</strong><span>environment</span></div><div><b>⚡</b><strong>${n.energy.toFixed(0)}%</strong><span>energy security</span></div></div></article>${advisorPanel()}${goalsPanel()}${newspaper()}</div>`}
 function cities(){const n=state.nation;return `<div class="content"><div class="sectionhead"><div><small>SETTLEMENTS · ${n.actionPoints} ACTIONS LEFT</small><h2>Your cities are strategic assets.</h2></div><button class="primary" data-action="camera">VIEW WORLD</button></div><div class="citygrid">${n.cities.map((c,i)=>`<article class="citycard" data-city="${i}"><div class="city-art ${c.type.toLowerCase()}"><span>${c.type==='Capital'?'★':'●'}</span><div class="mini-buildings">${Array.from({length:7+i%4},(_,j)=>`<i style="height:${20+(j*13)%48}px"></i>`).join('')}</div></div><div class="citybody"><div><small>${c.type}</small><h3>${c.name}</h3></div><strong>${c.pop.toFixed(1)}M</strong><p>Wealth ${c.wealth.toFixed(0)} · ${c.type==='Industrial'?'factories and freight':c.type==='University'?'research and students':c.type==='Coastal'?'trade and ports':'housing, services and roads'}</p><button data-city-project="${i}" data-project="${c.type==='Industrial'?'industry':c.type==='University'?'research':c.type==='Coastal'?'port':'housing'}">INVEST +</button></div></article>`).join('')}</div><div class="panel city-projects"><small>CITY PIPELINE</small><div class="project-strip">${n.projects.slice(-5).reverse().map(p=>`<span><b>${p.city}</b><em>${p.title}</em><i>Year ${p.year}</i></span>`).join('')||'<span><b>No projects yet</b><em>Invest in a city to create your first landmark.</em></span>'}</div></div></div>`}
 
@@ -374,6 +377,7 @@ function createScene(){
      animation=requestAnimationFrame(tick);
      if(worldGroup){worldGroup.rotation.y+=.0007;const spatial=worldGroup.userData.spatial;if(spatial){spatial.rotation.y+=.0018;spatial.rotation.z+=.00035;spatial.children.forEach((o,i)=>{if(o.isMesh&&o.geometry?.type==='SphereGeometry')o.scale.setScalar(1+Math.sin(performance.now()*.002+i)*.12)})}}
      positionCityOverlay();
+     syncMapMaturity();
      if(renderer&&scene&&camera){if(composer)composer.render();else renderer.render(scene,camera);}
    };
    tick();
@@ -420,9 +424,22 @@ function insideLand(x,z,margin=.35){
 function buildWorld(){
  const n=state.nation; const land=state.terrainSeed||n.terrain;
  worldGroup.userData.cityAnchors=[];
- const progress=clamp((state.year-1)/40,0,1);
+ const mapBase=n.mapBase||{year:1,population:n.population,infrastructure:46,urban:51,industry:35,energy:55,education:65,technology:25,cities:5};
+ // Development is deliberately relative to the founding state. Year 1 is a frontier;
+ // by the late game the same geography should read as a dense, highly engineered nation.
+ const yearGrowth=clamp((state.year-1)/32,0,1);
+ const relative=(now,start,weight)=>clamp((now-start)/Math.max(1,100-start),0,1)*weight;
+ const development=clamp(yearGrowth*.30
+   +relative(n.infrastructure,mapBase.infrastructure,.16)
+   +relative(n.urban,mapBase.urban,.16)
+   +relative(n.industry,mapBase.industry,.12)
+   +relative(n.energy,mapBase.energy,.08)
+   +relative(n.tech,mapBase.technology,.06)
+   +clamp(((n.cities.length-mapBase.cities)/Math.max(1,8-mapBase.cities)),0,1)*.12,0,1);
+ const progress=development;
  const infrastructure=clamp(n.infrastructure/100,0,1), industry=clamp(n.industry/100,0,1), urban=clamp(n.urban/100,0,1), environment=clamp(n.environment/100,0,1), energy=clamp(n.energy/100,0,1);
  const railBuilt=hasProject('rail'), powerBuilt=hasProject('energy'), industryBuilt=hasProject('industry'), greenBuilt=hasProject('green'), megaBuilt=hasProject('megaproject');
+ const mapTier=development<.12?'FRONTIER':development<.3?'EMERGING':development<.52?'DEVELOPING':development<.75?'DEVELOPED':'MAJOR POWER';
  // Water and land base remain stable; development is layered on top of them.
  const water=new THREE.Mesh(new THREE.PlaneGeometry(90,90),mat(0x123e4b,.34));
  water.rotation.x=-Math.PI/2; water.position.y=-.92; water.receiveShadow=true; worldGroup.add(water);
@@ -437,7 +454,7 @@ function buildWorld(){
    worldGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),borderMat));
  }
  const terrainColors=land.includes('Desert')?[0xc59a61,0xb88b52]:land.includes('Mountain')?[0x667b72,0x50645f]:land.includes('Forest')?[0x41694b,0x34563e]:[0x5c7b55,0x7b8b55];
- const terrainCount=125+Math.round(progress*75)+Math.round(environment*.35*80);
+ const terrainCount=55+Math.round(progress*170)+Math.round(environment*.10*35);
  for(let i=0;i<terrainCount;i++){
    const a=mapRand(i*3+11)*Math.PI*2,r=Math.sqrt(mapRand(i*7+19))*11.65,x=Math.cos(a)*r,z=Math.sin(a)*r*.78;
    if(!insideLand(x,z,.1))continue;
@@ -456,7 +473,7 @@ function buildWorld(){
  // The national road network visibly upgrades with infrastructure and urbanization.
  const roadMat=mat(0x263438), roadGlow=new THREE.LineBasicMaterial({color:0xd3e2d8,transparent:true,opacity:.08+.18*infrastructure});
  const roadSets=[[[ -9,.76,3],[0,.77,0],[8.5,.76,-3]],[[ -7,.77,-5.5],[-2,.78,0],[5.2,.77,5.5]],[[7,.78,-6.2],[3,.78,-2],[0,.78,0]],[[ -4,.79,6],[0,.79,2],[4.5,.79,.5]]];
- const extraRoads=Math.floor(infrastructure*5+urban*3);
+ const extraRoads=Math.floor(1+development*32+infrastructure*8+urban*4);
  roadSets.forEach((pts,ri)=>{const clean=pts.filter(p=>insideLand(p[0],p[2],.2));if(clean.length>1){const curve=new THREE.CatmullRomCurve3(clean.map(p=>new THREE.Vector3(...p)));worldGroup.add(new THREE.Mesh(new THREE.TubeGeometry(curve,.0+28, .055+.035*infrastructure,5,false),roadMat));if(infrastructure>.55)worldGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(35)),roadGlow))}});
  for(let r=0;r<extraRoads;r++){
    const a=(r/Math.max(1,extraRoads))*Math.PI*2+.2, end=8.5+mapRand(r+80)*3;
@@ -474,14 +491,16 @@ function buildWorld(){
  const count=n.cities.length;
  n.cities.forEach((c,i)=>{
    const pos=cityPosition(i,count);const city=new THREE.Group();city.userData={cityIndex:i,cityX:pos.x,cityZ:pos.z};
-   const cityScale=clamp(.65+(c.pop/8)*.22+(c.wealth/100)*.32+urban*.25,0.65,1.8);
+   const cityScale=clamp(.48+development*.95+(c.pop/8)*.10+(c.wealth/100)*.18,0.48,2.35);
    const plaza=new THREE.Mesh(new THREE.CylinderGeometry(i===0?1.8:1.15,i===0?1.8:1.15,.12,16),mat(i===0?0xc29a61:0x6c766b));plaza.position.y=.82;plaza.scale.setScalar(cityScale);city.add(plaza);
-   const countBuildings=Math.max(8,Math.round((i===0?28:7)+(c.pop*9)+(c.wealth*.10)+(urban*12)+(progress*8)));
+   const foundingBuildings=i===0?4:1;
+   const lateGameBuildings=i===0?150:55;
+   const countBuildings=Math.max(1,Math.round(foundingBuildings+(lateGameBuildings-foundingBuildings)*development+(c.pop*2.2*development)+(c.wealth*.12*development)));
    for(let b=0;b<countBuildings;b++){
      const angle=mapRand(i*100+b*3+1)*Math.PI*2,rr=Math.sqrt(mapRand(i*100+b*3+2))*(i===0?2.7:1.7)*cityScale;
      const bx=pos.x+Math.cos(angle)*rr,bz=pos.z+Math.sin(angle)*rr;
      if(!insideLand(bx,bz,.25))continue;
-     const h=(.45+c.wealth/36+Math.sqrt(Math.max(.1,c.pop))*0.42+mapRand(i*100+b)*1.05)*(0.75+urban*.55);
+     const h=(.28+development*(.65+c.wealth/48+Math.sqrt(Math.max(.1,c.pop))*.34+mapRand(i*100+b)*1.45))*(0.75+urban*.75);
      const building=new THREE.Mesh(new THREE.BoxGeometry(.25+mapRand(i*50+b)*.35,.25+h,.25+mapRand(i*50+b+1)*.35),mat(c.type==='Industrial'?0x596168:c.type==='University'?0x7f8a77:c.wealth>65?0xb58d71:0x8b8172));
      building.position.set(bx-pos.x,.87+h/2,bz-pos.z);building.castShadow=true;city.add(building);
    }
@@ -506,6 +525,8 @@ function buildWorld(){
  // Construction sites show that projects are underway before completion.
  (n.activeProjects||[]).forEach((p,i)=>{const pos=cityPosition((i+2)%Math.max(1,count),count);const site=new THREE.Group();const foundation=new THREE.Mesh(new THREE.BoxGeometry(1.2,0.12,1),mat(0x8a7655));foundation.position.y=.86;site.add(foundation);const crane=new THREE.Mesh(new THREE.BoxGeometry(.06,2.8,.06),mat(0xb39a64));crane.position.set(.45,2.2,0);site.add(crane);const arm=new THREE.Mesh(new THREE.BoxGeometry(1.4,.06,.06),mat(0xb39a64));arm.position.set(.15,3.45,0);site.add(arm);site.position.set(pos.x+(i%2)*.8,pos.y||0,pos.z+(i%2)*.5);worldGroup.add(site)});
  applyLayer();
+ // Small status marker makes the transformation explicit without changing the existing HUD layout.
+ const host=$('#scene'); if(host){host.dataset.mapTier=mapTier;host.dataset.mapDevelopment=Math.round(development*100);}
 }
 function addSpatialUI(){
  if(!worldGroup)return;
@@ -516,6 +537,15 @@ function addSpatialUI(){
  const points=[['GDP',n.gdp,0x8ce5e8],['PEOPLE',n.population/1e6,0xb7e9b0],['POWER',n.military.deterrence,0xd7b06f],['GREEN',n.environment,0x77c98f],['STABILITY',n.stability,0xb9a3d6]];
  points.forEach((q,i)=>{const a=i/points.length*Math.PI*2;const rr=7.4;const node=new THREE.Mesh(new THREE.SphereGeometry(.11+(i===0?.08:0),12,8),new THREE.MeshBasicMaterial({color:q[2],transparent:true,opacity:.85}));node.position.set(Math.cos(a)*rr,.95,Math.sin(a)*rr*.76);node.userData.metric=q[0];orbit.add(node)});
  worldGroup.add(orbit); worldGroup.userData.spatial=orbit;
+}
+
+function syncMapMaturity(){
+ const host=$('#scene'); const n=state.nation; if(!host||!n)return;
+ const mapBase=n.mapBase||{}; const yearGrowth=clamp((state.year-1)/32,0,1);
+ const rel=(now,start,weight)=>clamp((now-(start??now))/Math.max(1,100-(start??now)),0,1)*weight;
+ const d=clamp(yearGrowth*.30+rel(n.infrastructure,mapBase.infrastructure,.16)+rel(n.urban,mapBase.urban,.16)+rel(n.industry,mapBase.industry,.12)+rel(n.energy,mapBase.energy,.08)+rel(n.tech,mapBase.technology,.06)+clamp(((n.cities?.length||0)-(mapBase.cities||0))/Math.max(1,8-(mapBase.cities||0)),0,1)*.12,0,1);
+ const tier=d<.12?'FRONTIER':d<.3?'EMERGING':d<.52?'DEVELOPING':d<.75?'DEVELOPED':'MAJOR POWER';
+ const v=$('#map-maturity-value',host),bar=$('#map-maturity-bar',host); if(v)v.textContent=`${tier} · ${Math.round(d*100)}%`; if(bar)bar.style.width=`${Math.round(d*100)}%`;
 }
 
 function syncCityOverlay(){
