@@ -205,6 +205,8 @@ function initLandingGlobe(){
  landingRenderer.setPixelRatio(Math.min(1.7,window.devicePixelRatio||1));
  landingRenderer.setSize(w,h,false);
  landingRenderer.outputColorSpace=THREE.SRGBColorSpace;
+ landingRenderer.setClearColor(0x000000,0);
+ landingRenderer.autoClear=true;
  host.appendChild(landingRenderer.domElement);
 
  landingGlobe=new THREE.Group();
