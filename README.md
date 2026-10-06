@@ -1,35 +1,14 @@
-# Forge a Nation V6 — Simulation Core
+# Forge a Nation V6.4 — Living Cities
 
-V6 keeps the V5.6 visual foundation and landing globe, but replaces the click-only progression with a real turn-based nation simulation.
+V6.4 fixes city investment and connects city-level decisions directly to the 3D world.
 
-## Core loop
-
-Observe pressure → spend limited government actions → commit resources → advance the year → resolve consequences → adapt.
-
-### New simulation systems
-- 3 government actions per year
-- Real treasury costs and fiscal balance
-- Multi-year construction projects
-- Supply pressure for food, water, energy and housing
-- Inflation and cost-of-living pressure
-- Employment and urbanization feedback
-- Political group support
-- Emerging crises based on actual national conditions
-- Crisis response choices with real trade-offs
-- Trade and diplomatic action costs
-- City investment costs and action limits
-- Rail, megaproject, energy, culture, museum and festival decisions are implemented
-- Persistent project/history/news records
-- V6 save format with fallback migration from the previous save
-
-## Preserved
-- Landing-page ThreeUI-inspired matrix globe
-- Nation creator
-- Existing 3D world/map
-- Existing navigation and visual system
-- No multiplayer changes
-
-## Verification
-- `node --check src/main.js` passes.
-- ZIP integrity checked after packaging.
-- Full Vite browser build was not run in this environment because dependencies are not installed here.
+- City investment buttons are fully wired and guarded.
+- City state persists: development, investment count, infrastructure, industry, research, port and housing.
+- Investing in a specific city immediately changes that city's local development and visible map footprint.
+- City-specific roads and development zones grow around the selected city.
+- City buildings scale from sparse settlements to dense urban districts.
+- City population and wealth continue evolving each year.
+- City overlays show local development percentage.
+- City detail modal shows local development and investment count.
+- Legacy saves are migrated safely.
+- No multiplayer changes.
