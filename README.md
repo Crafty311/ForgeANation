@@ -21,3 +21,6 @@ V5.4 expands the V5.3 simulation without replacing its map/UI foundation.
 
 ## Deployment
 The Vercel build script invokes Vite through Node directly, avoiding executable-bit issues with `node_modules/.bin/vite` in restricted build environments.
+
+## Landing visual reference
+The start-page globe is a native Three.js implementation inspired by ThreeUI's "Globe — Network Globe" visual language (dotted globe, routes, glow, interaction). The existing game-world renderer is unchanged. Reference: https://threeui.com/backgrounds/

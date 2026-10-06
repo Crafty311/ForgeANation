@@ -175,12 +175,112 @@ function featureModal(){return `<div class="modal"><div class="modalcard feature
 function reportModal(){const n=state.nation;return `<div class="modal"><div class="modalcard report"><button class="close" data-action="close">×</button><small>YEAR ${state.year} REPORT</small><h2>${n.name} is changing.</h2><p>${n.cities.length} cities now form the backbone of a ${n.terrain.toLowerCase()} nation. Your strongest visible system is ${n.infrastructure>n.environment?'infrastructure':'environment'}.</p><div class="reportgrid">${metric('GDP',money(n.gdp),n.lastReport?.changes?`${n.lastReport.changes.gdp>=0?'+':''}${money(n.lastReport.changes.gdp)}`:'')}${metric('POP',fmt(n.population/1e6)+'M')}${metric('APPROVAL',n.approval+'%')}${metric('HOUSING',n.housing.toFixed(0)+'%')}${metric('ENVIRONMENT',n.environment+'%')}${metric('STABILITY',n.stability+'%')}</div><button class="primary widebtn" data-action="close">BACK TO COUNTRY</button></div></div>`}
 function cityModal(i){const c=state.nation.cities[i];return `<div class="modal"><div class="modalcard citymodal"><button class="close" data-action="close">×</button><small>${c.type.toUpperCase()}</small><h2>${c.name}</h2><div class="citybig"><div class="city-art large ${c.type.toLowerCase()}"><div class="mini-buildings">${Array.from({length:16},(_,j)=>`<i style="height:${20+(j*19)%75}px"></i>`).join('')}</div></div></div><div class="metricgrid">${metric('POPULATION',(c.pop).toFixed(2)+'M')}${metric('WEALTH',c.wealth.toFixed(0)+'/100')}${metric('ROLE',c.type)}${metric('GROWTH','+'+(1.2+(c.wealth/100)).toFixed(1)+'%')}</div><p>This city is part of the living map. As the simulation advances, its density, wealth and built form respond to your national decisions.</p></div></div>`}
 
+let landingRenderer,landingScene,landingCamera,landingGlobe,landingComposer,landingBloom,landingFrame,landingResize;
+function disposeLandingScene(){
+ if(landingFrame)cancelAnimationFrame(landingFrame);
+ landingFrame=null;
+ if(landingResize){window.removeEventListener('resize',landingResize);landingResize=null}
+ if(landingComposer){landingComposer.dispose();landingComposer=null}
+ if(landingRenderer){landingRenderer.dispose();landingRenderer=null}
+ landingScene=null;landingCamera=null;landingGlobe=null;landingBloom=null;
+}
+function initLandingGlobe(){
+ const host=$('#landing-globe');
+ if(!host)return;
+ disposeLandingScene();
+ const w=Math.max(1,host.clientWidth),h=Math.max(1,host.clientHeight);
+ landingScene=new THREE.Scene();
+ landingCamera=new THREE.PerspectiveCamera(32,w/h,.1,100);
+ landingCamera.position.set(0,0,7.2);
+ landingCamera.lookAt(0,0,0);
+ landingRenderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});
+ landingRenderer.setPixelRatio(Math.min(1.7,window.devicePixelRatio||1));
+ landingRenderer.setSize(w,h,false);
+ landingRenderer.outputColorSpace=THREE.SRGBColorSpace;
+ host.appendChild(landingRenderer.domElement);
+
+ landingGlobe=new THREE.Group();
+ landingGlobe.rotation.z=-0.16;
+ landingScene.add(landingGlobe);
+
+ // ThreeUI-inspired network globe: a dense, luminous point matrix rather than a solid country shape.
+ const pts=[],cols=[];
+ const golden=(1+Math.sqrt(5))/2;
+ const count=2400;
+ for(let i=0;i<count;i++){
+   const y=1-(i/(count-1))*2;
+   const r=Math.sqrt(Math.max(0,1-y*y));
+   const a=i*golden*Math.PI*2;
+   const x=Math.cos(a)*r,z=Math.sin(a)*r;
+   const wobble=0.985+0.025*Math.sin(i*0.37);
+   pts.push(x*wobble*2.28,y*wobble*2.28,z*wobble*2.28);
+   const edge=Math.pow(Math.max(0,Math.abs(z/2.28)),1.8);
+   cols.push(0.30+0.25*edge,0.78+0.12*(1-edge),0.80+0.14*(1-edge));
+ }
+ const pg=new THREE.BufferGeometry();
+ pg.setAttribute('position',new THREE.Float32BufferAttribute(pts,3));
+ pg.setAttribute('color',new THREE.Float32BufferAttribute(cols,3));
+ const pm=new THREE.PointsMaterial({size:.026,vertexColors:true,transparent:true,opacity:.9,depthWrite:false,blending:THREE.AdditiveBlending});
+ const matrix=new THREE.Points(pg,pm);
+ landingGlobe.add(matrix);
+
+ // Fine latitude/longitude matrix lines add the dimensional grid read.
+ const gridMat=new THREE.LineBasicMaterial({color:0x67d7dc,transparent:true,opacity:.105,depthWrite:false,blending:THREE.AdditiveBlending});
+ for(let lat=-75;lat<=75;lat+=15){
+   const ring=[]; const phi=THREE.MathUtils.degToRad(lat); const rr=Math.cos(phi)*2.305; const yy=Math.sin(phi)*2.305;
+   for(let j=0;j<=96;j++){const a=j/96*Math.PI*2;ring.push(new THREE.Vector3(Math.cos(a)*rr,yy,Math.sin(a)*rr))}
+   landingGlobe.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ring),gridMat));
+ }
+ for(let lon=0;lon<360;lon+=15){
+   const ring=[]; const a=THREE.MathUtils.degToRad(lon);
+   for(let j=0;j<=96;j++){const p=-Math.PI/2+j/96*Math.PI;ring.push(new THREE.Vector3(Math.cos(p)*Math.cos(a)*2.305,Math.sin(p)*2.305,Math.cos(p)*Math.sin(a)*2.305))}
+   landingGlobe.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ring),gridMat));
+ }
+
+ // Sparse orbital data routes, matching the Network Globe language.
+ const routeMat=new THREE.LineBasicMaterial({color:0x8ce5e8,transparent:true,opacity:.28,blending:THREE.AdditiveBlending});
+ const nodes=[];
+ for(let i=0;i<18;i++){
+   const a=i*2.399, y=Math.sin(i*1.71)*.72, r=Math.sqrt(1-y*y);
+   nodes.push(new THREE.Vector3(Math.cos(a)*r*2.31,y*2.31,Math.sin(a)*r*2.31));
+ }
+ for(let i=0;i<nodes.length;i+=2){
+   const a=nodes[i],b=nodes[(i+5)%nodes.length],curve=[];
+   for(let j=0;j<=32;j++){const t=j/32; const p=a.clone().lerp(b,t); const lift=Math.sin(Math.PI*t)*(.22+.08*(i%3)); p.normalize().multiplyScalar(2.31+lift); curve.push(p)}
+   landingGlobe.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve),routeMat));
+ }
+ const nodeGeo=new THREE.BufferGeometry().setFromPoints(nodes);
+ const nodeMat=new THREE.PointsMaterial({color:0xd4ffff,size:.065,transparent:true,opacity:.9,depthWrite:false,blending:THREE.AdditiveBlending});
+ landingGlobe.add(new THREE.Points(nodeGeo,nodeMat));
+
+ landingComposer=new EffectComposer(landingRenderer);
+ landingComposer.addPass(new RenderPass(landingScene,landingCamera));
+ landingBloom=new UnrealBloomPass(new THREE.Vector2(w,h),.7,.75,.72);
+ landingComposer.addPass(landingBloom);
+
+ let targetX=0,targetY=0,dragging=false,lastX=0,lastY=0;
+ host.addEventListener('pointermove',e=>{const r=host.getBoundingClientRect();targetY=((e.clientX-r.left)/r.width-.5)*.45;targetX=((e.clientY-r.top)/r.height-.5)*.25;if(dragging){landingGlobe.rotation.y+=(e.clientX-lastX)*.005;landingGlobe.rotation.x+=(e.clientY-lastY)*.005;lastX=e.clientX;lastY=e.clientY}});
+ host.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;host.setPointerCapture?.(e.pointerId)});
+ host.addEventListener('pointerup',e=>{dragging=false;host.releasePointerCapture?.(e.pointerId)});
+ host.addEventListener('pointerleave',()=>{dragging=false});
+
+ landingResize=()=>{const ww=Math.max(1,host.clientWidth),hh=Math.max(1,host.clientHeight);landingCamera.aspect=ww/hh;landingCamera.updateProjectionMatrix();landingRenderer.setSize(ww,hh,false);landingComposer.setSize(ww,hh)};
+ window.addEventListener('resize',landingResize);
+ const animate=()=>{
+   landingFrame=requestAnimationFrame(animate);
+   if(!dragging){landingGlobe.rotation.y+=.0017;landingGlobe.rotation.x+=(targetX*.35-landingGlobe.rotation.x)*.025;landingGlobe.rotation.z+=(-.16-targetY*.18-landingGlobe.rotation.z)*.018}
+   landingComposer.render();
+ };
+ animate();
+}
 function boot(){document.body.innerHTML='<div id="app"></div>';if(load())showGame();else showLanding();}
 function showLanding(){
+ disposeLandingScene();
  const app=$('#app');
- app.innerHTML=`<main class="landing"><div class="landing-glow"></div><div class="landing-copy"><small>SIMULATE · BUILD · WATCH IT LIVE</small><h1>FORGE<br><span>A NATION</span></h1><p>Build a country. Then zoom into it and watch your decisions become cities, roads, factories, farms and history.</p><button class="primary launch" data-action="create">CREATE YOUR NATION <b>→</b></button><div class="landing-note">LOCAL-FIRST · SINGLE PLAYER · NO ACCOUNT</div></div><div class="landing-world"><div class="orbit o1"></div><div class="orbit o2"></div><div class="toy-continent">${Array.from({length:28},(_,i)=>`<i style="left:${10+(i*29)%82}%;top:${12+(i*47)%72}%;height:${18+(i*17)%55}px;transform:rotate(${(i*37)%80-40}deg)"></i>`).join('')}</div></div></main>`;
+ app.innerHTML=`<main class="landing"><div class="landing-glow"></div><div class="landing-copy"><small>SIMULATE · BUILD · WATCH IT LIVE</small><h1>FORGE<br><span>A NATION</span></h1><p>Build a country. Then zoom into it and watch your decisions become cities, roads, factories, farms and history.</p><button class="primary launch" data-action="create">CREATE YOUR NATION <b>→</b></button><div class="landing-note">LOCAL-FIRST · SINGLE PLAYER · NO ACCOUNT</div></div><div class="landing-world"><div id="landing-globe" class="landing-globe"></div><div class="landing-orbit orbit-a"></div><div class="landing-orbit orbit-b"></div><div class="landing-scan">NATIONAL SYSTEM / INITIALIZING</div></div></main>`;
+ initLandingGlobe();
  const launch=$('.launch');
- if(launch) launch.onclick=()=>showCreator();
+ if(launch) launch.onclick=()=>{disposeLandingScene();showCreator()};
 }
 function showCreator(){const app=$('#app');app.innerHTML=`<main class="creator"><div class="creator-card"><div class="creator-head"><small>01 · IDENTITY</small><h1>Make somewhere worth watching.</h1><p>Choose broad traits. The simulation fills in the details.</p></div><div class="presetrow">${Object.keys(presets).map(k=>`<button data-preset="${k}">${k}</button>`).join('')}</div><div class="creator-grid"><label>Nation name<input id="cname" value="${create.name}"></label><label>Capital<input id="ccapital" value="${create.capital}"></label><label>Terrain<select id="cterrain">${terrains.map(t=>`<option ${t===create.terrain?'selected':''}>${t}</option>`).join('')}</select></label><label>Government<select id="cgov">${governments.map(t=>`<option ${t===create.government?'selected':''}>${t}</option>`).join('')}</select></label></div><div class="slidergrid">${[['area','Land area',2,2000],['pop','Population (M)',1,200],['urban','Urbanization',10,98],['edu','Education',20,98],['health','Healthcare',20,98],['industry','Industry',5,90],['agri','Agriculture',3,90],['tech','Technology',3,95]].map(x=>`<label><span>${x[1]} <b id="v-${x[0]}">${create[x[0]]}</b></span><input type="range" data-create="${x[0]}" min="${x[2]}" max="${x[3]}" value="${create[x[0]]}"></label>`).join('')}</div><div class="creator-foot"><div><small>VIABILITY</small><b id="viability">Balanced</b></div><button type="button" class="primary" data-action="forge" id="forge-nation-btn">FORGE THIS NATION →</button></div></div></main>`;$$('[data-preset]').forEach(b=>b.onclick=()=>{Object.assign(create,presets[b.dataset.preset]);showCreator()});$$('[data-create]').forEach(i=>i.oninput=()=>{create[i.dataset.create]=+i.value;$('#v-'+i.dataset.create).textContent=i.value;updateViability()});$$('#cname,#ccapital,#cterrain,#cgov').forEach(i=>i.oninput=()=>{if(i.id==='cname')create.name=i.value;if(i.id==='ccapital')create.capital=i.value;if(i.id==='cterrain')create.terrain=i.value;if(i.id==='cgov')create.government=i.value});const forgeBtn=$('#forge-nation-btn');if(forgeBtn)forgeBtn.onclick=()=>createNation();updateViability()}
 function updateViability(){const pressure=(create.pop/Math.max(10,create.area))*18+Math.abs(create.industry-create.agri)*.15;$('#viability').textContent=pressure>35?'Extreme':pressure>20?'Challenging':'Balanced'}
