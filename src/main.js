@@ -660,7 +660,7 @@ function advanceYear(){
  sanitizeNation();
 
  const n=state.nation; const before={population:n.population,gdp:n.gdp,approval:n.approval,stability:n.stability,environment:n.environment,infrastructure:n.infrastructure,treasury:n.treasury};
- if(n.event){toast('Resolve the active crisis before ending the year.');return}
+ if(n.event && n.event.blocking!==false){toast('Resolve the active crisis before ending the year.');return}
  state.year++;
  completeProjects();
  const capacity=(n.tech*.0008+n.industry*.0005+n.economy.services*.00035+n.agri*.00018);
@@ -722,7 +722,7 @@ function advanceYear(){
  if(n.inflation>10)events.push(['💸','Cost-of-living crisis','Prices are rising fast enough to damage household confidence.','politics']);
  if(n.stability<45)events.push(['🏛️','Political instability','Coalition support is fragmenting and protests are becoming more likely.','politics']);
  if(n.pressure.score<25&&state.year%4===0)events.push(['📈','Growth opportunity','Demand is strong and investors are looking for a place to expand.','trade']);
- if(events.length){const e=events[0];n.event={icon:e[0],title:e[1],text:e[2],type:e[3],year:state.year};n.news.unshift({icon:e[0],title:e[1],text:e[2]});}
+ if(events.length){const e=events[0];n.event={icon:e[0],title:e[1],text:e[2],type:e[3],year:state.year,blocking:e[3]!=='trade'};n.news.unshift({icon:e[0],title:e[1],text:e[2]});}
  if(state.year%10===0){n.generation.number++;n.generation.label=['Founding Generation','Builders Generation','Growth Generation','Innovation Generation','Legacy Generation'][Math.min(4,n.generation.number-1)];n.history.push({year:state.year,title:'A new generation takes the stage',text:`The country enters generation ${n.generation.number}. Earlier investments now shape the lives of people growing up in a different nation.`});}
  if(state.year%12===0){const roles=[['scientist','Dr. Mira Sen','A young researcher becomes nationally known for turning university research into practical technology.'],['artist','Ari Vale','A cultural figure helps give the country a recognizable creative voice.'],['builder','Samir Holt','An engineer becomes famous for leading a landmark national project.']];const f=pick(roles);n.figures.push({year:state.year,role:f[0],name:f[1],text:f[2]});n.history.push({year:state.year,title:`${f[1]} enters national history`,text:f[2]});n.news.unshift({icon:'★',title:'A new national figure emerges',text:`${f[1]} is becoming known as a ${f[0]}.`});}
  const title=pick(['Households are moving toward the cities','Manufacturing demand is rising','A new generation enters the workforce','The treasury faces competing priorities','Local businesses report stronger demand','Infrastructure is changing regional trade']);
