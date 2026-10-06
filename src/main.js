@@ -181,7 +181,7 @@ function world(){return `<section class="world"><div class="world-head"><div><sm
 function overview(){const n=state.nation,p=activeProgression();return `<div class="panelgrid">${turnBanner()}<article class="panel hero"><small>NATIONAL SNAPSHOT</small><h2>${n.name}</h2><p>Your country is not a spreadsheet. Watch geography, people, cities and institutions react to your choices.</p><div class="identity-chip"><span>NATIONAL CHARACTER</span><b>${n.identity}</b><button data-explain="identity">?</button></div><div class="metricgrid">${metric('GDP',money(n.gdp),'annual output')} ${metric('INFLATION',n.inflation.toFixed(1)+'%','consumer prices')} ${metric('JOBS',n.jobs.toFixed(0)+'%','employment')} ${metric('HAPPINESS',n.happiness.toFixed(0)+'%','public mood')}</div></article><article class="panel progression"><small>NATION PROGRESSION</small><div class="levelrow"><div><b>LEVEL ${p.cur.level}</b><strong>${p.cur.name}</strong></div><span>${Math.round(n.xp)} XP${p.next?' / '+p.next.xp+' XP':''}</span></div><div class="xpbar"><i style="width:${p.pct}%"></i></div><p>${p.next?`Next: <b>${p.next.name}</b> — ${p.next.unlock}.`:'Maximum current level reached.'}</p><button class="explain-link" data-explain="xp">What does XP do?</button><div class="missionmini"><small>ACTIVE MISSIONS</small>${n.missions.filter(m=>!m.complete).slice(0,3).map(m=>`<div><b>${m.title}</b><span>+${m.reward} XP</span></div>`).join('')}</div></article><article class="panel"><small>WHAT IS HAPPENING</small>${n.event?`<div class="eventbig active-event"><b>${n.event.icon} ${n.event.title}</b><p>${n.event.text}</p><div class="event-actions"><button data-event-choice="invest">Invest to contain</button><button data-event-choice="restrict">Use emergency powers</button><button data-event-choice="wait">Wait it out</button></div></div>`:`<div class="eventbig"><b>${n.news[0].icon} ${n.news[0].title}</b><p>${n.news[0].text}</p></div>`}<div class="eventbig"><b>${n.news[1].icon} ${n.news[1].title}</b><p>${n.news[1].text}</p></div></article><article class="panel wide"><small>VISIBLE CONSEQUENCES</small><div class="consequence-row"><div><b>🏙️</b><strong>${n.cities.length} cities</strong><span>urban network</span></div><div><b>🏭</b><strong>${Math.round(n.industry*1.7)} industry</strong><span>production base</span></div><div><b>🌾</b><strong>${Math.round(n.agri)} agriculture</strong><span>food capacity</span></div><div><b>🌳</b><strong>${n.environment}%</strong><span>environment</span></div><div><b>⚡</b><strong>${n.energy.toFixed(0)}%</strong><span>energy security</span></div></div></article>${advisorPanel()}${goalsPanel()}${newspaper()}</div>`}
 function cities(){const n=state.nation;return `<div class="content"><div class="sectionhead"><div><small>SETTLEMENTS · ${n.actionPoints} ACTIONS LEFT</small><h2>Your cities are strategic assets.</h2></div><button class="primary" data-action="camera">VIEW WORLD</button></div><div class="citygrid">${n.cities.map((c,i)=>`<article class="citycard" data-city="${i}"><div class="city-art ${c.type.toLowerCase()}"><span>${c.type==='Capital'?'★':'●'}</span><div class="mini-buildings">${Array.from({length:7+i%4},(_,j)=>`<i style="height:${20+(j*13)%48}px"></i>`).join('')}</div></div><div class="citybody"><div><small>${c.type}</small><h3>${c.name}</h3></div><strong>${c.pop.toFixed(1)}M</strong><p>Wealth ${c.wealth.toFixed(0)} · ${c.type==='Industrial'?'factories and freight':c.type==='University'?'research and students':c.type==='Coastal'?'trade and ports':'housing, services and roads'}</p><button data-city-project="${i}" data-project="${c.type==='Industrial'?'industry':c.type==='University'?'research':c.type==='Coastal'?'port':'housing'}">INVEST +</button></div></article>`).join('')}</div><div class="panel city-projects"><small>CITY PIPELINE</small><div class="project-strip">${n.projects.slice(-5).reverse().map(p=>`<span><b>${p.city}</b><em>${p.title}</em><i>Year ${p.year}</i></span>`).join('')||'<span><b>No projects yet</b><em>Invest in a city to create your first landmark.</em></span>'}</div></div></div>`}
 
-function cardsFor(view){const n=state.nation;const common={development:[['Infrastructure',n.infrastructure+'%','roads and utilities'],['Megaprojects',n.projects.length,'built landmarks'],['Energy',n.energy.toFixed(0)+'%','security'],['Housing',n.housing.toFixed(0)+'%','capacity'],['Resources',Math.round((n.resources.food+n.resources.water+n.resources.minerals)/3),'national base'],['Technology',n.tech+'%','capability']],culture:[['Creativity',Math.round(n.culture.creativity)+'%','arts and ideas'],['Participation',Math.round(n.culture.participation)+'%','civic life'],['Prestige',Math.round(n.culture.prestige)+'%','international reach'],['Education',n.edu+'%','knowledge base'],['Tourism',Math.round(n.resources.tourism)+'%','visitor appeal'],['Identity',n.identity,'national character']],economy:[['GDP',money(n.gdp),'▲ productive capacity'],['Inflation',n.inflation.toFixed(1)+'%','◆ prices'],['Treasury',money(n.treasury),'cash on hand'],['Debt',money(n.debt),'service pressure'],['Industry',n.industry+'%','of economic base'],['Agriculture',n.agri+'%','food system']],people:[['Population',fmt(n.population/1e6)+'M','growing'],['Urbanization',n.urban+'%','living in cities'],['Education',n.edu+'%','human capital'],['Healthcare',n.health+'%','access'],['Housing',n.housing.toFixed(0)+'%','capacity'],['Employment',n.jobs.toFixed(0)+'%','labor market']],government:[['Approval',n.approval+'%','national'],['Stability',n.stability+'%','institutional'],['Government',n.government,'system'],['Civil mood',n.happiness+'%','public'],['Provinces',n.provinces.length,'regions'],['Year',state.year,'term']],diplomacy:[['Neighbors',6,'generated states'],['Relations',72,'average'],['Trade partners',4,'active'],['Alliances',2,'defense'],['Influence',n.tech+30,'soft power'],['Tension',18,'regional']],military:[['Readiness',Math.round(45+n.industry*.3)+'%','forces'],['Defense',money(n.gdp*.025),'annual'],['Army',Math.round(n.pop*.8)+'k','personnel'],['Navy',n.terrain.includes('Coast')?'Active':'Limited','maritime'],['Air force',n.tech>45?'Modern':'Developing','capability'],['Logistics',n.infrastructure+'%','network']]};return common[view]||common.economy}
+function cardsFor(view){const n=state.nation;const common={development:[['Infrastructure',n.infrastructure+'%','roads and utilities'],['Megaprojects',n.projects.length,'built landmarks'],['Energy',n.energy.toFixed(0)+'%','security'],['Housing',n.housing.toFixed(0)+'%','capacity'],['Resources',Math.round((n.resources.food+n.resources.water+n.resources.minerals)/3),'national base'],['Technology',n.tech+'%','capability']],culture:[['Creativity',Math.round(n.culture.creativity)+'%','arts and ideas'],['Participation',Math.round(n.culture.participation)+'%','civic life'],['Prestige',Math.round(n.culture.prestige)+'%','international reach'],['Education',n.edu+'%','knowledge base'],['Tourism',Math.round(n.resources.tourism)+'%','visitor appeal'],['Identity',n.identity,'national character']],economy:[['GDP',money(n.gdp),'▲ productive capacity'],['Inflation',n.inflation.toFixed(1)+'%','◆ prices'],['Treasury',money(n.treasury),'cash on hand'],['Debt',money(n.debt),'service pressure'],['Industry',n.industry+'%','of economic base'],['Agriculture',n.agri+'%','food system']],people:[['Population',fmt(n.population/1e6)+'M','growing'],['Urbanization',n.urban+'%','living in cities'],['Education',n.edu+'%','human capital'],['Healthcare',n.health+'%','access'],['Housing',n.housing.toFixed(0)+'%','capacity'],['Employment',n.jobs.toFixed(0)+'%','labor market']],government:[['Approval',n.approval+'%','national'],['Stability',n.stability+'%','institutional'],['Government',n.government,'system'],['Civil mood',n.happiness+'%','public'],['Provinces',n.provinces.length,'regions'],['Year',state.year,'term']],diplomacy:[['Neighbors',n.neighbors.length,'generated states'],['Relations',Math.round(n.neighbors.reduce((a,b)=>a+b.relation,0)/Math.max(1,n.neighbors.length)),'average'],['Trade partners',n.neighbors.filter(x=>x.relation>=65).length,'strong ties'],['Alliances',n.neighbors.filter(x=>x.relation>=82).length,'defense ties'],['Influence',Math.round(n.tech*.35+n.culture.prestige*.35+n.approval*.15+n.neighbors.reduce((a,b)=>a+b.relation,0)/Math.max(1,n.neighbors.length)*.15),'soft power'],['Tension',Math.round(100-n.neighbors.reduce((a,b)=>a+b.relation,0)/Math.max(1,n.neighbors.length)),'regional']],military:[['Readiness',Math.round(n.military.deterrence)+'%','forces'],['Defense',money(n.gdp*(n.spending.defense/100)*.055),'annual'],['Army',Math.round(n.military.army*1.25)+'k','personnel capacity'],['Navy',n.terrain.includes('Coast')?Math.round(n.military.navy)+'%':'Limited','maritime'],['Air force',n.military.air>70?'Advanced':n.military.air>45?'Modern':'Developing','capability'],['Logistics',Math.round(n.military.logistics)+'%','network']]};return common[view]||common.economy}
 function dashboard(view){
  const n=state.nation;
  const cards=cardsFor(view);
@@ -206,7 +206,37 @@ function missionBoard(){const n=state.nation;return `<div class="content"><div c
 function history(){const n=state.nation;return `<div class="content"><div class="sectionhead"><div><small>NATIONAL MEMORY</small><h2>Your decisions leave scars and landmarks.</h2></div><div class="history-stat"><b>${state.year}</b><span>${n.generation.label}</span></div></div><div class="history-feature"><div><small>NATIONAL IDENTITY</small><strong>${n.identity}</strong><span>What your choices have made the country become.</span></div><div><small>FIGURES</small><strong>${n.figures.length}</strong><span>people who entered the national story</span></div><div><small>PROJECTS</small><strong>${n.projects.length}</strong><span>landmarks built by your government</span></div></div><div class="timeline">${n.history.slice().reverse().map(h=>`<article><b>${h.year}</b><div><h3>${h.title}</h3><p>${h.text}</p></div></article>`).join('')}</div>${n.figures.length?`<article class="panel figures-panel"><small>PEOPLE OF THE NATION</small><div class="figure-grid">${n.figures.slice().reverse().map(f=>`<div><b>★ ${f.name}</b><small>${f.role} · Year ${f.year}</small><p>${f.text}</p></div>`).join('')}</div></article>`:''}</div>`}
 function mainContent(){if(state.view==='map')return world();if(state.view==='cities')return `<div class="workspace">${world()}${cities()}</div>`;if(state.view==='overview')return `<div class="workspace">${world()}${overview()}</div>`;if(state.view==='history')return history();if(state.view==='missions')return missionBoard();return `<div class="workspace">${world()}${dashboard(state.view)}</div>`}
 
-function featureModal(){return `<div class="modal"><div class="modalcard featuremodal"><button class="close" data-action="close">×</button><small>SIMULATION ENGINE</small><h2>Choose what your nation can simulate.</h2><p>Start with the world you want. Turn deeper systems on as you become curious.</p><div class="featuretabs">${Object.keys(features).map(k=>`<button class="${state.modalCat===k?'active':''}" data-fcat="${k}">${k}</button>`).join('')}</div><div class="featuregrid">${(features[state.modalCat||'WORLD']||[]).map((f,i)=>`<button class="featuretile ${state.nation.features.includes(f)?'on':''}" data-feature="${f}"><b>${state.nation.features.includes(f)?'✓':'＋'}</b><span>${f}</span><small>${['visual','interactive','systemic'][i%3]} layer</small></button>`).join('')}</div></div></div>`}
+function featureModal(){
+ const active={
+  'Cities':'Cities grow from population, wealth and investment.',
+  'Natural Resources':'Food, water, minerals, energy and tourism feed the economy.',
+  'Social Groups':'Workers, business, youth, rural and urban groups react to policy.',
+  'Housing':'Housing shortages create pressure and can trigger crises.',
+  'Education':'Education compounds into technology and productivity.',
+  'Healthcare':'Health affects resilience, happiness and long-run growth.',
+  'Culture':'Culture, tourism and prestige evolve through policy.',
+  'Industries':'Industry changes GDP, jobs, trade and environmental pressure.',
+  'Trade':'Exports and imports respond to growth and diplomacy.',
+  'Inflation':'Prices respond to growth, supply pressure and fiscal conditions.',
+  'Public Finance':'Treasury, revenue, spending and debt constrain decisions.',
+  'AI Neighbors':'Neighbor relations react to trade, diplomacy and deterrence.',
+  'Alliances':'Strong relationships can become security ties.',
+  'Foreign Aid':'Aid costs treasury but improves diplomatic relations.',
+  'Army':'Military readiness contributes to deterrence.',
+  'Cyber Command':'Cyber investment raises technology and deterrence.',
+  'Road Network':'Infrastructure physically changes the 3D world.',
+  'Rail Network':'Rail projects physically connect the cities.',
+  'Power Grid':'Energy projects add visible generation capacity.',
+  'Megaprojects':'Major projects become physical landmarks.',
+  'Research':'Research increases technology and future productivity.',
+  'National Museum':'The museum becomes part of national memory.',
+  'Historical Figures':'Long-term development creates people remembered by history.'
+ };
+ const planned=['Weather','Exploration','Terrain Evolution','Banking','Currency','Political Parties','Elections','Parliament','Media','Sanctions','Intelligence','Navy','Air Force','Military Bases','Space Program','Carbon Economy'];
+ const list=active;
+ return `<div class="modal"><div class="modalcard featuremodal"><button class="close" data-action="close">×</button><small>SIMULATION ENGINE</small><h2>What is actually simulated?</h2><p>Only systems that currently affect the game are shown as active. Planned systems are deliberately not fake buttons.</p><div class="featuretabs">${Object.keys(features).map(k=>`<button class="${state.modalCat===k?'active':''}" data-fcat="${k}">${k}</button>`).join('')}</div><div class="featuregrid">${(features[state.modalCat||'WORLD']||[]).map(f=>list[f]?`<div class="featuretile on"><b>✓</b><span>${f}</span><small>${list[f]}</small></div>`:`<div class="featuretile planned"><b>·</b><span>${f}</span><small>${planned.includes(f)?'Planned system — not clickable yet':'Not exposed as a control yet'}</small></div>`).join('')}</div></div></div>`;
+}
+
 function reportModal(){const n=state.nation;return `<div class="modal"><div class="modalcard report"><button class="close" data-action="close">×</button><small>YEAR ${state.year} REPORT</small><h2>${n.name} is changing.</h2><p>${n.cities.length} cities now form the backbone of a ${n.terrain.toLowerCase()} nation. Your strongest visible system is ${n.infrastructure>n.environment?'infrastructure':'environment'}.</p><div class="reportgrid">${metric('GDP',money(n.gdp),n.lastReport?.changes?`${n.lastReport.changes.gdp>=0?'+':''}${money(n.lastReport.changes.gdp)}`:'')}${metric('POP',fmt(n.population/1e6)+'M')}${metric('APPROVAL',n.approval+'%')}${metric('HOUSING',n.housing.toFixed(0)+'%')}${metric('ENVIRONMENT',n.environment+'%')}${metric('STABILITY',n.stability+'%')}</div><button class="primary widebtn" data-action="close">BACK TO COUNTRY</button></div></div>`}
 function cityModal(i){const c=state.nation.cities[i];return `<div class="modal"><div class="modalcard citymodal"><button class="close" data-action="close">×</button><small>${c.type.toUpperCase()}</small><h2>${c.name}</h2><div class="citybig"><div class="city-art large ${c.type.toLowerCase()}"><div class="mini-buildings">${Array.from({length:16},(_,j)=>`<i style="height:${20+(j*19)%75}px"></i>`).join('')}</div></div></div><div class="metricgrid">${metric('POPULATION',(c.pop).toFixed(2)+'M')}${metric('WEALTH',c.wealth.toFixed(0)+'/100')}${metric('ROLE',c.type)}${metric('GROWTH','+'+(1.2+(c.wealth/100)).toFixed(1)+'%')}</div><p>This city is part of the living map. As the simulation advances, its density, wealth and built form respond to your national decisions.</p></div></div>`}
 
@@ -491,10 +521,10 @@ function buildWorld(){
  const count=n.cities.length;
  n.cities.forEach((c,i)=>{
    const pos=cityPosition(i,count);const city=new THREE.Group();city.userData={cityIndex:i,cityX:pos.x,cityZ:pos.z};
-   const cityScale=clamp(.48+development*.95+(c.pop/8)*.10+(c.wealth/100)*.18,0.48,2.35);
+   const cityScale=clamp(.32+development*1.45+(c.pop/8)*.10+(c.wealth/100)*.18,0.32,2.65);
    const plaza=new THREE.Mesh(new THREE.CylinderGeometry(i===0?1.8:1.15,i===0?1.8:1.15,.12,16),mat(i===0?0xc29a61:0x6c766b));plaza.position.y=.82;plaza.scale.setScalar(cityScale);city.add(plaza);
-   const foundingBuildings=i===0?4:1;
-   const lateGameBuildings=i===0?150:55;
+   const foundingBuildings=i===0?1:0;
+   const lateGameBuildings=i===0?180:72;
    const countBuildings=Math.max(1,Math.round(foundingBuildings+(lateGameBuildings-foundingBuildings)*development+(c.pop*2.2*development)+(c.wealth*.12*development)));
    for(let b=0;b<countBuildings;b++){
      const angle=mapRand(i*100+b*3+1)*Math.PI*2,rr=Math.sqrt(mapRand(i*100+b*3+2))*(i===0?2.7:1.7)*cityScale;
@@ -519,7 +549,7 @@ function buildWorld(){
  }
  // Industrial districts, farms, and restored green corridors visibly change the land.
  if(n.agri>45){const farmCount=Math.round(4+n.agri*.12);for(let i=0;i<farmCount;i++){const a=mapRand(i+190)*6.28,r=5+mapRand(i+230)*5,x=Math.cos(a)*r,z=Math.sin(a)*r*.75;if(!insideLand(x,z,.3))continue;const farm=new THREE.Mesh(new THREE.BoxGeometry(.7,.035,1.2),mat(0xb0a060));farm.position.set(x,.82,z);farm.rotation.y=a;worldGroup.add(farm)}}
- const trees=8+Math.round(environment*.28*80)+(greenBuilt?18:0);for(let i=0;i<trees;i++){const a=mapRand(i+400)*6.28,r=6.5+mapRand(i+500)*5,x=Math.cos(a)*r,z=Math.sin(a)*r*.78;if(!insideLand(x,z,.2))continue;const t=new THREE.Mesh(new THREE.ConeGeometry(.16+.08*environment,.55+.45*environment,5),mat(0x3b6d47));t.position.set(x,.9,z);t.castShadow=true;worldGroup.add(t)}
+ const trees=2+Math.round(environment*.28*80*development)+(greenBuilt?18:0);for(let i=0;i<trees;i++){const a=mapRand(i+400)*6.28,r=6.5+mapRand(i+500)*5,x=Math.cos(a)*r,z=Math.sin(a)*r*.78;if(!insideLand(x,z,.2))continue;const t=new THREE.Mesh(new THREE.ConeGeometry(.16+.08*environment,.55+.45*environment,5),mat(0x3b6d47));t.position.set(x,.9,z);t.castShadow=true;worldGroup.add(t)}
  // Megaprojects are deliberately unmistakable on the map.
  if(megaBuilt){const landmark=new THREE.Group();const core=new THREE.Mesh(new THREE.CylinderGeometry(.8,1.05,3.8,10),mat(0xd0b16e));core.position.y=2.6;landmark.add(core);const halo=new THREE.Mesh(new THREE.TorusGeometry(1.45,.055,8,48),new THREE.MeshBasicMaterial({color:0xd7b06f,transparent:true,opacity:.65}));halo.rotation.x=Math.PI/2;halo.position.y=3.1;landmark.add(halo);landmark.position.set(4,0,3.2);worldGroup.add(landmark)}
  // Construction sites show that projects are underway before completion.
@@ -603,7 +633,32 @@ function completeProjects(){
  n.activeProjects=remain;
  return completed;
 }
+function sanitizeNation(){
+ const n=state.nation;if(!n)return;
+ const numeric=['gdp','approval','infrastructure','environment','inflation','debt','energy','housing','jobs','stability','happiness','urban','population','edu','health','industry','agri','tech','treasury','tax'];
+ for(const k of numeric){if(!Number.isFinite(Number(n[k]))) n[k]=k==='population'?1000000:(k==='gdp'?10:50);}
+ n.actionPoints=Number.isFinite(n.actionPoints)?clamp(Math.round(n.actionPoints),0,n.maxActions||3):3;
+ n.maxActions=Number.isFinite(n.maxActions)?Math.max(1,Math.round(n.maxActions)):3;
+ n.activeProjects=Array.isArray(n.activeProjects)?n.activeProjects.filter(p=>p&&Number.isFinite(p.remaining)):[];
+ n.cities=Array.isArray(n.cities)?n.cities:[]; n.neighbors=Array.isArray(n.neighbors)?n.neighbors:[];
+ n.groups=Array.isArray(n.groups)?n.groups:[];
+ n.resources=n.resources||{}; for(const k of ['food','water','minerals','energy','tourism']) n.resources[k]=Number.isFinite(Number(n.resources[k]))?clamp(Number(n.resources[k]),0,100):50;
+ n.military=n.military||{}; for(const k of ['army','navy','air','cyber','logistics','deterrence']) n.military[k]=Number.isFinite(Number(n.military[k]))?clamp(Number(n.military[k]),0,100):25;
+ n.trade=n.trade||{exports:1,imports:1,tariff:8};
+ if(!Number.isFinite(n.trade.exports))n.trade.exports=1;if(!Number.isFinite(n.trade.imports))n.trade.imports=1;
+}
 function advance(){
+ const snapshot=state.nation?JSON.parse(JSON.stringify(state.nation)):null; const oldYear=state.year;
+ try{ advanceYear(); }
+ catch(error){
+  console.error('Year simulation recovered from error',error);
+  if(snapshot)state.nation=snapshot; state.year=oldYear; state.playing=false; sanitizeNation(); save();
+  toast('The year engine recovered safely. No progress was lost.'); showGame({preserveScroll:true});
+ }
+}
+function advanceYear(){
+ sanitizeNation();
+
  const n=state.nation; const before={population:n.population,gdp:n.gdp,approval:n.approval,stability:n.stability,environment:n.environment,infrastructure:n.infrastructure,treasury:n.treasury};
  if(n.event){toast('Resolve the active crisis before ending the year.');return}
  state.year++;
@@ -618,7 +673,14 @@ function advance(){
  const revenue=n.gdp*(n.tax/100)*.055;
  const spending=n.gdp*.025+n.spending.education*.01+n.spending.health*.01+n.spending.infrastructure*.01+n.spending.defense*.01+n.spending.welfare*.01;
  n.fiscalBalance=revenue-spending;
+ const debtService=Math.min(n.gdp*.018,n.debt*.045);
+ n.fiscalBalance-=debtService;
+ n.debt=clamp(n.debt-n.fiscalBalance*.08+debtService*.12,0,n.gdp*1.8);
  n.treasury=clamp(n.treasury+n.fiscalBalance,0,n.gdp*.35);
+ const supplyPressure=(n.pressure?.score||0);
+ n.prices.food=clamp((n.prices.food||100)+(n.pressure?.food||0)*.08-(n.resources.food-55)*.025,70,220);
+ n.prices.energy=clamp((n.prices.energy||100)+(n.pressure?.energy||0)*.10-(n.resources.energy-55)*.03,70,240);
+ n.prices.housing=clamp((n.prices.housing||100)+(n.pressure?.housing||0)*.10-(n.housing-55)*.025,70,240);
  n.inflation=clamp(n.inflation+(n.gdp>before.gdp?.12:-.08)+(n.treasury<1?.45:0)+(n.pressure?.score>55?.3:0),1,18);
  n.approval=clamp(n.approval+(n.pressure?.score<25?1:-1.4)+(n.jobs>92?1:-.7)+(n.inflation>8?-1.4:0)+(n.housing<40?-1.2:0),20,94);
  n.happiness=clamp(n.happiness+(n.approval-60)*.015+(n.housing-60)*.01-(n.inflation-5)*.04,25,95);
@@ -668,7 +730,7 @@ function advance(){
  n.news.unshift({icon:pick(['🏗️','🏙️','🌾','📈','⚡','🚆']),title,text:`The country enters Year ${state.year} with ${n.actionPoints} government actions available.`});
  n.news=n.news.slice(0,5);
  n.actionPoints=n.maxActions;
- awardXP(10,'Year advanced');checkMissions();n.lastReport={year:state.year,changes:{population:n.population-before.population,gdp:n.gdp-before.gdp,approval:n.approval-before.approval,stability:n.stability-before.stability,environment:n.environment-before.environment,infrastructure:n.infrastructure-before.infrastructure,treasury:n.treasury-before.treasury}};updateIdentity();save();showGame({preserveScroll:true});if(state.view!=='history')state.modal='report';showGame({preserveScroll:true})
+ awardXP(10,'Year advanced');checkMissions();n.lastReport={year:state.year,changes:{population:n.population-before.population,gdp:n.gdp-before.gdp,approval:n.approval-before.approval,stability:n.stability-before.stability,environment:n.environment-before.environment,infrastructure:n.infrastructure-before.infrastructure,treasury:n.treasury-before.treasury}};updateIdentity();sanitizeNation();save();if(state.view!=='history')state.modal='report';showGame({preserveScroll:true})
 }
 function spendAction(type){
  const d=decisionDefs[type]; const n=state.nation;
@@ -681,7 +743,7 @@ function spendAction(type){
 }
 function queueProject(type,title,cost,years,effect){
  const n=state.nation;
- n.activeProjects.push({type,title,cost,remaining:years,total:years,effect,year:state.year});
+ n.activeProjects.push({type,title,cost,remaining:years,total:years,effect,year:state.year,status:'under construction'});
  n.projects.push({type,title,city:'Nationwide',year:state.year,status:'under construction'});
 }
 function policy(type){
@@ -777,7 +839,7 @@ function bindGame(){
  $$('[data-event-choice]').forEach(b=>b.onclick=e=>{e.preventDefault();eventDecision(b.dataset.eventChoice)});
  $$('[data-action]').forEach(b=>b.onclick=e=>{e.preventDefault();const a=b.dataset.action;if(a==='advance'){if(state.playing){state.playing=false;showGame({preserveScroll:true})}else advance()}else if(a==='save'){save();toast('Nation saved locally.')}else if(a==='create'){showCreator()}else if(a==='forge'){createNation()}else if(a==='new'){state.nation=null;localStorage.removeItem('forgeNationV6');localStorage.removeItem('forgeNationV52');showLanding()}else if(a==='features'){state.modal='features';state.modalCat='WORLD';showGame({preserveScroll:true})}else if(a==='report'){state.modal='report';showGame({preserveScroll:true})}else if(a==='close'){state.modal=null;showGame({preserveScroll:true})}else if(a==='camera'){navigate('map')}else if(a==='policy'){policy(b.dataset.policy)}else if(a==='diplomacy'){diplomacyAction(b.dataset.diplomacy,+b.dataset.neighbor||0)}});
  $$('[data-city]').forEach(c=>c.onclick=e=>{e.preventDefault();state.modal='city';state.selected=+c.dataset.city;showGame({preserveScroll:true})});
- $$('[data-city-project]').forEach(b=>b.onclick=e=>{e.preventDefault();const i=+b.dataset.cityProject,type=b.dataset.project,n=state.nation,c=n.cities[i];const titles={industry:'Industrial district',research:'University research campus',port:'Port expansion',housing:'Urban housing district'};const costs={industry:2.8,research:2.4,port:3.2,housing:2.6};if(n.actionPoints<1){toast('No city-planning action left this year.');return}if(n.treasury<costs[type]){toast('Treasury cannot afford this city project.');return}n.actionPoints--;n.treasury-=costs[type];n.projects.push({type,title:titles[type],city:c.name,year:state.year,status:'complete'});c.wealth=clamp(c.wealth+6,0,100);n.infrastructure=clamp(n.infrastructure+2,0,100);if(type==='industry'){n.industry=clamp(n.industry+3,0,100);n.economy.manufacturing+=3}if(type==='research'){n.edu=clamp(n.edu+2,0,100);n.tech+=3}if(type==='port'){n.trade.exports*=1.04}if(type==='housing'){n.housing=clamp(n.housing+4,0,100)}awardXP(8,`City project: ${titles[type]}`);n.news.unshift({icon:'🏙️',title:`${titles[type]} built in ${c.name}`,text:`The project cost ${money(costs[type])} and used one government action.`});updatePressure();save();showGame({preserveScroll:true})});
+ $$('[data-city-project]').forEach(b=>b.onclick=e=>{e.preventDefault();const i=+b.dataset.cityProject,type=b.dataset.project,n=state.nation,c=n.cities[i];const titles={industry:'Industrial district',research:'University research campus',port:'Port expansion',housing:'Urban housing district'};const costs={industry:2.8,research:2.4,port:3.2,housing:2.6};if(n.actionPoints<1){toast('No city-planning action left this year.');return}if(n.treasury<costs[type]){toast('Treasury cannot afford this city project.');return}if(n.projects.some(p=>p.city===c.name&&p.type===type&&p.year===state.year)){toast('That project is already in this city this year.');return}n.actionPoints--;n.treasury-=costs[type];n.projects.push({type,title:titles[type],city:c.name,year:state.year,status:'complete'});c.wealth=clamp(c.wealth+6,0,100);n.infrastructure=clamp(n.infrastructure+2,0,100);if(type==='industry'){n.industry=clamp(n.industry+3,0,100);n.economy.manufacturing+=3}if(type==='research'){n.edu=clamp(n.edu+2,0,100);n.tech+=3}if(type==='port'){n.trade.exports*=1.04}if(type==='housing'){n.housing=clamp(n.housing+4,0,100)}awardXP(8,`City project: ${titles[type]}`);n.news.unshift({icon:'🏙️',title:`${titles[type]} built in ${c.name}`,text:`The project cost ${money(costs[type])} and used one government action.`});updatePressure();save();showGame({preserveScroll:true})});
  $$('[data-diplomacy]').forEach(b=>b.onclick=e=>{e.preventDefault();diplomacyAction(b.dataset.diplomacy,+b.dataset.neighbor||0)});
  $$('[data-fcat]').forEach(b=>b.onclick=e=>{e.preventDefault();state.modalCat=b.dataset.fcat;showGame({preserveScroll:true})});
  $$('[data-feature]').forEach(b=>b.onclick=e=>{e.preventDefault();const f=b.dataset.feature;const i=state.nation.features.indexOf(f);if(i>=0)state.nation.features.splice(i,1);else state.nation.features.push(f);save();showGame({preserveScroll:true})})
