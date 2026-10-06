@@ -1,26 +1,21 @@
-# Forge a Nation — V5.4
+# Forge a Nation v2.5 — World Playground
 
-V5.4 expands the V5.3 simulation without replacing its map/UI foundation.
+A local-first nation simulator with a large interactive 3D map.
 
-## Simulation
-- Economic sectors, treasury, tax pressure and public spending
-- Demographic/social groups with different reactions to policy
-- City specialization and city-level investment projects
-- Trade balance and neighbor relationships
-- Military capability and deterrence
-- Persistent events with player responses and consequences
-- Richer national history and progression XP
-- Reactive 3D spatial data field around the existing nation map
+## Run
 
-## 3D / UI
-- Three.js post-processing bloom
-- Procedural orbital metric rings and data nodes
-- Spatial HUD labels for population/economy/military layers
-- Existing city/building world preserved
-- Navigation updates the active content state without a browser-style page refresh
+```bash
+npm install
+npm run dev
+```
 
-## Deployment
-The Vercel build script invokes Vite through Node directly, avoiding executable-bit issues with `node_modules/.bin/vite` in restricted build environments.
+Open the localhost address shown by Vite.
 
-## Landing visual reference
-The start-page globe is a native Three.js implementation inspired by ThreeUI's "Globe — Network Globe" visual language (dotted globe, routes, glow, interaction). The existing game-world renderer is unchanged. Reference: https://threeui.com/backgrounds/
+## v2.5
+- Larger cinematic map viewport
+- Stronger data-driven map colors
+- More expressive city architecture based on wealth, industry and technology
+- Animated economic/transport traffic between cities
+- Quick map-layer exploration controls
+- More playful, readable interaction design
+- Preserves the working v2.3 actual-map renderer foundation
