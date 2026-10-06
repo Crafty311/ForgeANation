@@ -404,6 +404,8 @@ function fallbackScene(host){
 }
 
 function mat(color,rough=.8){return new THREE.MeshStandardMaterial({color,roughness:rough,metalness:.05})}
+function mapRand(seed){const x=Math.sin(seed*12.9898)*43758.5453;return x-Math.floor(x)}
+function hasProject(type){const n=state.nation;return (n.projects||[]).some(p=>p.type===type&&p.status!=='under construction') || (n.activeProjects||[]).some(p=>p.type===type)}
 function cityPosition(i,count){
  const angles=[-0.35,0.45,1.28,2.05,2.9,3.82,4.62,5.35,0.95,4.05];
  const radii=[2.1,5.0,6.0,6.9,6.4,7.3,5.8,7.1,7.9,8.2];
@@ -418,72 +420,91 @@ function insideLand(x,z,margin=.35){
 function buildWorld(){
  const n=state.nation; const land=state.terrainSeed||n.terrain;
  worldGroup.userData.cityAnchors=[];
- // A large water plane makes the coastline unambiguous; the land plate always sits above it.
+ const progress=clamp((state.year-1)/40,0,1);
+ const infrastructure=clamp(n.infrastructure/100,0,1), industry=clamp(n.industry/100,0,1), urban=clamp(n.urban/100,0,1), environment=clamp(n.environment/100,0,1), energy=clamp(n.energy/100,0,1);
+ const railBuilt=hasProject('rail'), powerBuilt=hasProject('energy'), industryBuilt=hasProject('industry'), greenBuilt=hasProject('green'), megaBuilt=hasProject('megaproject');
+ // Water and land base remain stable; development is layered on top of them.
  const water=new THREE.Mesh(new THREE.PlaneGeometry(90,90),mat(0x123e4b,.34));
  water.rotation.x=-Math.PI/2; water.position.y=-.92; water.receiveShadow=true; worldGroup.add(water);
  const base=new THREE.Mesh(new THREE.CylinderGeometry(13.05,13.05,1.35,96),mat(0x314c3b));
  base.scale.z=.82; base.receiveShadow=true; base.castShadow=true; worldGroup.add(base);
  const coast=new THREE.Mesh(new THREE.RingGeometry(12.62,13.12,128),mat(0x8aa16b,.72));
  coast.scale.z=.82; coast.rotation.x=-Math.PI/2; coast.position.y=.18; worldGroup.add(coast);
- // subtle province separators keep the map legible without turning it into a dashboard grid.
  const borderMat=new THREE.LineBasicMaterial({color:0xb5c58a,transparent:true,opacity:.23});
  for(let i=0;i<6;i++){
-   const a=-.15+i*(Math.PI*2/6), pts=[];
-   for(let j=0;j<18;j++){const r=1.2+j*.64; pts.push(new THREE.Vector3(Math.cos(a)*r,.72,Math.sin(a)*r*.76))}
-   const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),borderMat); worldGroup.add(line);
+   const a=-.15+i*(Math.PI*2/6),pts=[];
+   for(let j=0;j<18;j++){const r=1.2+j*.64;pts.push(new THREE.Vector3(Math.cos(a)*r,.72,Math.sin(a)*r*.76))}
+   worldGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),borderMat));
  }
  const terrainColors=land.includes('Desert')?[0xc59a61,0xb88b52]:land.includes('Mountain')?[0x667b72,0x50645f]:land.includes('Forest')?[0x41694b,0x34563e]:[0x5c7b55,0x7b8b55];
- for(let i=0;i<135;i++){
-   const a=Math.random()*Math.PI*2,r=Math.sqrt(Math.random())*11.65,x=Math.cos(a)*r,z=Math.sin(a)*r*.78;
-   if(!insideLand(x,z,.1)) continue;
-   const h=.12+Math.random()*.35+(Math.random()>.91?Math.random()*1.2:0);
-   const g=new THREE.Mesh(new THREE.CylinderGeometry(.5+Math.random()*.7,.7+Math.random()*.8,h,7),mat(pick(terrainColors)));
-   g.position.set(x,h/2-.15,z);g.castShadow=true;worldGroup.add(g)
+ const terrainCount=125+Math.round(progress*75)+Math.round(environment*.35*80);
+ for(let i=0;i<terrainCount;i++){
+   const a=mapRand(i*3+11)*Math.PI*2,r=Math.sqrt(mapRand(i*7+19))*11.65,x=Math.cos(a)*r,z=Math.sin(a)*r*.78;
+   if(!insideLand(x,z,.1))continue;
+   const h=.12+mapRand(i*13+2)*.35+(mapRand(i*17+4)>.91?mapRand(i*23+8)*1.2:0);
+   const g=new THREE.Mesh(new THREE.CylinderGeometry(.5+mapRand(i)*.7,.7+mapRand(i+1)*.8,h,7),mat(pick(terrainColors)));
+   g.position.set(x,h/2-.15,z);g.castShadow=true;worldGroup.add(g);
  }
  for(let i=0;i<(land.includes('Mountain')?10:5);i++){
-   const x=-8.5+i*4.0+(Math.random()-.5)*1.2,z=-6.7+(Math.random()-.5)*2;
-   const m=new THREE.Mesh(new THREE.ConeGeometry(1.5+Math.random(),3+Math.random()*3,7),mat(0x596d69));
+   const x=-8.5+i*4.0+(mapRand(i+31)-.5)*1.2,z=-6.7+(mapRand(i+41)-.5)*2;
+   const m=new THREE.Mesh(new THREE.ConeGeometry(1.5+mapRand(i+51),3+mapRand(i+61)*3,7),mat(0x596d69));
    if(insideLand(x,z,.2)){m.position.set(x,1.2,z);m.castShadow=true;worldGroup.add(m)}
  }
- // Rivers terminate safely before reaching the coast; they no longer visually cut through city districts.
- const riverCurve=new THREE.CatmullRomCurve3([
-   new THREE.Vector3(-11,.67,-6.5),new THREE.Vector3(-7,.7,-3.8),new THREE.Vector3(-3,.72,-.8),
-   new THREE.Vector3(1,.72,2.4),new THREE.Vector3(5,.7,4.8),new THREE.Vector3(9,.67,6.0)
- ]);
+ // Rivers.
+ const riverCurve=new THREE.CatmullRomCurve3([new THREE.Vector3(-11,.67,-6.5),new THREE.Vector3(-7,.7,-3.8),new THREE.Vector3(-3,.72,-.8),new THREE.Vector3(1,.72,2.4),new THREE.Vector3(5,.7,4.8),new THREE.Vector3(9,.67,6.0)]);
  worldGroup.add(new THREE.Mesh(new THREE.TubeGeometry(riverCurve,38,.13,7,false),mat(0x4a9db0,.25)));
- const roadMat=mat(0x263438);
- for(const pts of [
-   [[-9,.76,3],[0,.77,0],[8.5,.76,-3]],
-   [[-7,.77,-5.5],[-2,.78,0],[5.2,.77,5.5]],
-   [[7,.78,-6.2],[3,.78,-2.0],[0,.78,0]],
-   [[-4,.79,6.0],[0,.79,2.0],[4.5,.79,.5]]
- ]){
-   const clean=pts.filter(p=>insideLand(p[0],p[2],.2));
-   if(clean.length>1){const curve=new THREE.CatmullRomCurve3(clean.map(p=>new THREE.Vector3(...p)));worldGroup.add(new THREE.Mesh(new THREE.TubeGeometry(curve,35,.075,5,false),roadMat))}
+ // The national road network visibly upgrades with infrastructure and urbanization.
+ const roadMat=mat(0x263438), roadGlow=new THREE.LineBasicMaterial({color:0xd3e2d8,transparent:true,opacity:.08+.18*infrastructure});
+ const roadSets=[[[ -9,.76,3],[0,.77,0],[8.5,.76,-3]],[[ -7,.77,-5.5],[-2,.78,0],[5.2,.77,5.5]],[[7,.78,-6.2],[3,.78,-2],[0,.78,0]],[[ -4,.79,6],[0,.79,2],[4.5,.79,.5]]];
+ const extraRoads=Math.floor(infrastructure*5+urban*3);
+ roadSets.forEach((pts,ri)=>{const clean=pts.filter(p=>insideLand(p[0],p[2],.2));if(clean.length>1){const curve=new THREE.CatmullRomCurve3(clean.map(p=>new THREE.Vector3(...p)));worldGroup.add(new THREE.Mesh(new THREE.TubeGeometry(curve,.0+28, .055+.035*infrastructure,5,false),roadMat));if(infrastructure>.55)worldGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(35)),roadGlow))}});
+ for(let r=0;r<extraRoads;r++){
+   const a=(r/Math.max(1,extraRoads))*Math.PI*2+.2, end=8.5+mapRand(r+80)*3;
+   const pts=[new THREE.Vector3(0,.80,0),new THREE.Vector3(Math.cos(a)*end*.48,.81,Math.sin(a)*end*.38),new THREE.Vector3(Math.cos(a)*end,.80,Math.sin(a)*end*.76)];
+   if(pts.every(q=>insideLand(q.x,q.z,.3)))worldGroup.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),26,.045+.025*infrastructure,5,false),roadMat));
+ }
+ // Rail appears only after the player actually builds it.
+ if(railBuilt){
+   const railMat=new THREE.MeshStandardMaterial({color:0x9ea9a4,metalness:.7,roughness:.35});
+   const railPoints=[[-10,.86,4],[ -3,.88,1],[0,.89,0],[4,.88,-2.2],[9,.86,-3.2]];
+   const rail=new THREE.CatmullRomCurve3(railPoints.map(p=>new THREE.Vector3(...p)));
+   worldGroup.add(new THREE.Mesh(new THREE.TubeGeometry(rail,70,.035,5,false),railMat));
+   worldGroup.add(new THREE.Mesh(new THREE.TubeGeometry(rail,70,.035,5,false),new THREE.MeshBasicMaterial({color:0xb8d6d0,transparent:true,opacity:.28})));
  }
  const count=n.cities.length;
  n.cities.forEach((c,i)=>{
-   const pos=cityPosition(i,count); const city=new THREE.Group(); city.userData={cityIndex:i,cityX:pos.x,cityZ:pos.z};
-   const plaza=new THREE.Mesh(new THREE.CylinderGeometry(i===0?1.8:1.15,i===0?1.8:1.15,.12,16),mat(i===0?0xc29a61:0x6c766b));
-   plaza.position.y=.82; city.add(plaza);
-   const countBuildings=i===0?34:10+Math.floor(c.pop*7);
+   const pos=cityPosition(i,count);const city=new THREE.Group();city.userData={cityIndex:i,cityX:pos.x,cityZ:pos.z};
+   const cityScale=clamp(.65+(c.pop/8)*.22+(c.wealth/100)*.32+urban*.25,0.65,1.8);
+   const plaza=new THREE.Mesh(new THREE.CylinderGeometry(i===0?1.8:1.15,i===0?1.8:1.15,.12,16),mat(i===0?0xc29a61:0x6c766b));plaza.position.y=.82;plaza.scale.setScalar(cityScale);city.add(plaza);
+   const countBuildings=Math.max(8,Math.round((i===0?28:7)+(c.pop*9)+(c.wealth*.10)+(urban*12)+(progress*8)));
    for(let b=0;b<countBuildings;b++){
-     let bx,bz; let tries=0;
-     do{bx=pos.x+(Math.random()-.5)*(i===0?3.0:1.9);bz=pos.z+(Math.random()-.5)*(i===0?2.6:1.8);tries++}while(!insideLand(bx,bz,.25)&&tries<20);
-     if(!insideLand(bx,bz,.2)) continue;
-     const h=(c.wealth/32)+Math.random()*1.35+(c.type==='Industrial'?Math.random()*.7:0);
-     const building=new THREE.Mesh(new THREE.BoxGeometry(.25+Math.random()*.35,h,.25+Math.random()*.35),mat(c.type==='Industrial'?0x596168:c.type==='University'?0x7f8a77:c.wealth>65?0xb58d71:0x8b8172));
-     building.position.set(bx-pos.x,.87+h/2,bz-pos.z);building.castShadow=true;building.userData.landChecked=true;city.add(building)
+     const angle=mapRand(i*100+b*3+1)*Math.PI*2,rr=Math.sqrt(mapRand(i*100+b*3+2))*(i===0?2.7:1.7)*cityScale;
+     const bx=pos.x+Math.cos(angle)*rr,bz=pos.z+Math.sin(angle)*rr;
+     if(!insideLand(bx,bz,.25))continue;
+     const h=(.45+c.wealth/36+Math.sqrt(Math.max(.1,c.pop))*0.42+mapRand(i*100+b)*1.05)*(0.75+urban*.55);
+     const building=new THREE.Mesh(new THREE.BoxGeometry(.25+mapRand(i*50+b)*.35,.25+h,.25+mapRand(i*50+b+1)*.35),mat(c.type==='Industrial'?0x596168:c.type==='University'?0x7f8a77:c.wealth>65?0xb58d71:0x8b8172));
+     building.position.set(bx-pos.x,.87+h/2,bz-pos.z);building.castShadow=true;city.add(building);
    }
-   // landmark tower makes the capital/population centers visible at normal zoom.
-   if(i===0){const tower=new THREE.Mesh(new THREE.BoxGeometry(.45,3.2,.45),mat(0xc7aa6f));tower.position.y=2.45;tower.castShadow=true;city.add(tower)}
+   if(c.type==='Industrial' || industryBuilt){
+     const stacks=Math.max(1,Math.round(1+industry*.08*10));
+     for(let k=0;k<stacks;k++){const stack=new THREE.Mesh(new THREE.CylinderGeometry(.09,.13,.8+industry*.8,8),mat(0x68716e));stack.position.set((mapRand(i*9+k)-.5)*2,.9,(mapRand(i*11+k)-.5)*1.6);city.add(stack);}
+   }
+   if(c.type==='University' && n.edu>55){const dome=new THREE.Mesh(new THREE.SphereGeometry(.32,16,8,0,Math.PI*2,0,Math.PI/2),mat(0xb5c8b6));dome.position.set(0,1.2,0);city.add(dome)}
+   if(i===0){const tower=new THREE.Mesh(new THREE.BoxGeometry(.45+.18*progress,3.2+2.5*cityScale,.45+.18*progress),mat(0xc7aa6f));tower.position.y=2.45+1.2*cityScale;tower.castShadow=true;city.add(tower)}
    city.position.set(pos.x,0,pos.z);worldGroup.add(city);worldGroup.userData.cityAnchors.push(city);
  });
- for(let i=0;i<34;i++){
-   const a=Math.random()*6.28,r=7+Math.random()*4,x=Math.cos(a)*r,z=Math.sin(a)*r*.78;
-   if(!insideLand(x,z,.2)) continue;
-   const t=new THREE.Mesh(new THREE.ConeGeometry(.18,.65,5),mat(0x3b6d47));t.position.set(x,.9,z);t.castShadow=true;worldGroup.add(t)
+ // Energy plants become physical landmarks as the power system expands.
+ if(powerBuilt || n.energy>70){
+   const plantCount=1+Math.floor((n.energy-55)/12);
+   for(let i=0;i<plantCount;i++){const x=-8+i*5.4,z=-5.5+Math.sin(i)*1.8;if(!insideLand(x,z,.3))continue;const plant=new THREE.Group();const body=new THREE.Mesh(new THREE.BoxGeometry(1.2,.8,1),mat(0x59676a));body.position.y=1.05;plant.add(body);for(let k=0;k<2;k++){const stack=new THREE.Mesh(new THREE.CylinderGeometry(.13,.17,1.5,10),mat(0xa0aaa5));stack.position.set(-.3+k*.6,1.8,0);plant.add(stack)}plant.position.set(x,0,z);worldGroup.add(plant)}
  }
+ // Industrial districts, farms, and restored green corridors visibly change the land.
+ if(n.agri>45){const farmCount=Math.round(4+n.agri*.12);for(let i=0;i<farmCount;i++){const a=mapRand(i+190)*6.28,r=5+mapRand(i+230)*5,x=Math.cos(a)*r,z=Math.sin(a)*r*.75;if(!insideLand(x,z,.3))continue;const farm=new THREE.Mesh(new THREE.BoxGeometry(.7,.035,1.2),mat(0xb0a060));farm.position.set(x,.82,z);farm.rotation.y=a;worldGroup.add(farm)}}
+ const trees=8+Math.round(environment*.28*80)+(greenBuilt?18:0);for(let i=0;i<trees;i++){const a=mapRand(i+400)*6.28,r=6.5+mapRand(i+500)*5,x=Math.cos(a)*r,z=Math.sin(a)*r*.78;if(!insideLand(x,z,.2))continue;const t=new THREE.Mesh(new THREE.ConeGeometry(.16+.08*environment,.55+.45*environment,5),mat(0x3b6d47));t.position.set(x,.9,z);t.castShadow=true;worldGroup.add(t)}
+ // Megaprojects are deliberately unmistakable on the map.
+ if(megaBuilt){const landmark=new THREE.Group();const core=new THREE.Mesh(new THREE.CylinderGeometry(.8,1.05,3.8,10),mat(0xd0b16e));core.position.y=2.6;landmark.add(core);const halo=new THREE.Mesh(new THREE.TorusGeometry(1.45,.055,8,48),new THREE.MeshBasicMaterial({color:0xd7b06f,transparent:true,opacity:.65}));halo.rotation.x=Math.PI/2;halo.position.y=3.1;landmark.add(halo);landmark.position.set(4,0,3.2);worldGroup.add(landmark)}
+ // Construction sites show that projects are underway before completion.
+ (n.activeProjects||[]).forEach((p,i)=>{const pos=cityPosition((i+2)%Math.max(1,count),count);const site=new THREE.Group();const foundation=new THREE.Mesh(new THREE.BoxGeometry(1.2,0.12,1),mat(0x8a7655));foundation.position.y=.86;site.add(foundation);const crane=new THREE.Mesh(new THREE.BoxGeometry(.06,2.8,.06),mat(0xb39a64));crane.position.set(.45,2.2,0);site.add(crane);const arm=new THREE.Mesh(new THREE.BoxGeometry(1.4,.06,.06),mat(0xb39a64));arm.position.set(.15,3.45,0);site.add(arm);site.position.set(pos.x+(i%2)*.8,pos.y||0,pos.z+(i%2)*.5);worldGroup.add(site)});
  applyLayer();
 }
 function addSpatialUI(){
