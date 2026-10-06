@@ -267,3 +267,38 @@ button,.btn,.primary,.nav,.world-actions button,.layerbar button,.decision-grid 
   .nav:hover,.world-actions button:hover,.layerbar button:hover,.decision-grid button:hover:not(:disabled){transform:none}
   .nav,.world-actions button,.layerbar button,.decision-grid button,.neighbor-list button{user-select:none}
 }
+
+/* V6.5.1 mobile usability: persistent New Nation action + readable text */
+.top-actions{display:flex;align-items:center;gap:7px;margin-left:auto}
+.new-nation-mobile{display:none;border:1px solid rgba(140,229,232,.42);background:rgba(140,229,232,.08);color:#eafafa;border-radius:8px;padding:8px 10px;font:700 9px var(--font-data);letter-spacing:.04em;white-space:nowrap;min-height:40px}
+
+@media(max-width:680px){
+  .top-actions{gap:6px}
+  .new-nation-mobile{display:inline-flex;align-items:center;justify-content:center}
+  .iconbtn{min-height:40px;padding:8px 10px;font-size:10px}
+  .content{font-size:14px}
+  .content p,.panel p,.citybody p,.advisor p,.goal small,.history-card p,.newspaper p,.eventbig p{font-size:12px;line-height:1.55}
+  .content small,.panel>small,.sectionhead small,.rightcard>small{font-size:9px;line-height:1.35}
+  .sectionhead h2,.panel h2{font-size:23px;line-height:1.2}
+  .panel h3,.citybody h3{font-size:17px;line-height:1.25}
+  .panel button,.content button{font-size:12px}
+  .metric span,.metric em{font-size:8px}
+  .metric strong{font-size:14px}
+  .turn-banner h3{font-size:17px}
+  .turn-stats span{font-size:11px}
+  .turn-stats b{font-size:15px}
+  .decision-grid button{font-size:12px!important;line-height:1.25}
+  .nav span{font-size:7px}
+  .nav i{font-size:17px}
+  .rightcard{font-size:12px}
+  .rightcard p{font-size:12px;line-height:1.45}
+  .widebtn{font-size:12px}
+}
+
+@media(max-width:390px){
+  .brand{font-size:10px}
+  .new-nation-mobile{padding-inline:8px;font-size:8px}
+  .iconbtn{padding-inline:8px;font-size:9px}
+  .content p,.panel p,.citybody p,.advisor p,.goal small,.history-card p,.newspaper p,.eventbig p{font-size:11.5px}
+  .sectionhead h2,.panel h2{font-size:21px}
+}
