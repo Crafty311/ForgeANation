@@ -120,3 +120,42 @@ html,body{overflow:hidden;height:100%;overscroll-behavior:none}
 #scene .spatial-label{position:absolute;z-index:8;pointer-events:none;font:7px var(--font-data);color:rgba(210,233,231,.58);letter-spacing:.12em;text-shadow:0 2px 8px #000}.world:has(#scene[data-layer="resources"]) #scene:after{content:"RESOURCE FIELD  /  FOOD · WATER · MINERALS"}.world:has(#scene[data-layer="infrastructure"]) #scene:after{content:"CIVIC NETWORK  /  ROADS · CITIES · PROJECTS"}.world:has(#scene[data-layer="environment"]) #scene:after{content:"ECOLOGICAL FIELD  /  LAND · WATER · CLIMATE"}
 @media(max-width:900px){.advisor-grid,.goal-grid{grid-template-columns:repeat(2,1fr)}.figure-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:760px){.advisor-grid,.goal-grid,.figure-grid,.history-feature{grid-template-columns:1fr}.newspaper h3{font-size:18px}}
+
+/* V5.6.4 creator readability pass — creation screen only */
+.creator{
+  scrollbar-width:auto;
+  scrollbar-color:rgba(140,229,232,.38) rgba(255,255,255,.025);
+}
+.creator::-webkit-scrollbar{width:12px}
+.creator::-webkit-scrollbar-track{background:rgba(255,255,255,.025);border-left:1px solid rgba(190,230,232,.06)}
+.creator::-webkit-scrollbar-thumb{background:linear-gradient(180deg,rgba(140,229,232,.46),rgba(140,229,232,.22));border:3px solid #050a0c;border-radius:99px}
+.creator::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,rgba(140,229,232,.66),rgba(140,229,232,.34))}
+.creator-card{padding:38px;max-height:none}
+.creator-head h1{font-size:46px;line-height:1.08}
+.creator-head p{font-size:15px;line-height:1.6;max-width:720px}
+.creator-head small{font-size:10px;letter-spacing:.13em}
+.presetrow{gap:8px;margin:26px 0}
+.presetrow button{padding:11px 14px;font-size:12px}
+.creator-grid{gap:14px}
+.creator-grid label,.slidergrid label{font-size:11px;line-height:1.45}
+.creator-grid input,.creator-grid select{margin-top:9px;padding:14px;font-size:15px;min-height:50px}
+.slidergrid{gap:20px 28px;margin:30px 0}
+.slidergrid span{font-size:11px}
+.slidergrid span b{font-size:12px;color:#dceceb}
+.slidergrid input{height:22px;margin-top:11px;cursor:pointer}
+.creator-foot{padding-top:22px}
+.creator-foot small{font-size:9px;letter-spacing:.1em}
+.creator-foot b{font-size:16px}
+#forge-nation-btn{font-size:12px;padding:14px 18px}
+@media(max-width:760px){
+  .creator{padding:28px 12px 40px;align-items:start}
+  .creator-card{width:100%;padding:24px 20px;border-radius:15px}
+  .creator-head h1{font-size:34px}
+  .creator-head p{font-size:14px}
+  .presetrow{margin:20px 0}
+  .creator-grid label,.slidergrid label{font-size:12px}
+  .creator-grid input,.creator-grid select{font-size:16px}
+  .slidergrid{gap:18px;margin:24px 0}
+  .creator-foot{gap:18px;align-items:stretch;flex-direction:column}
+  #forge-nation-btn{width:100%}
+}
