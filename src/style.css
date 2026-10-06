@@ -174,3 +174,96 @@ html,body{overflow:hidden;height:100%;overscroll-behavior:none}
 .map-maturity span{opacity:.68}.map-maturity b{font-size:10px;color:#d9ebe5;min-width:112px}.map-maturity i{display:block;width:105px;height:3px;background:rgba(200,220,210,.14);overflow:hidden}.map-maturity em{display:block;width:0;height:100%;background:#9bcfc2;transition:width .6s ease}
 #scene[data-map-tier="FRONTIER"] .map-maturity em{opacity:.55}
 #scene[data-map-tier="MAJOR POWER"] .map-maturity em{box-shadow:0 0 12px rgba(155,207,194,.45)}
+
+/* V6.5 — PC + mobile usability pass */
+html,body,#app{min-width:0;-webkit-text-size-adjust:100%;}
+button,.btn,.primary,.nav,.world-actions button,.layerbar button,.decision-grid button,.neighbor-list button{min-height:44px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.main{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.world{touch-action:none}
+#scene canvas{display:block;width:100%;height:100%;touch-action:none}
+.content{overflow-wrap:anywhere}
+.panel,.statcard,.rightcard,.creator,.history-card{min-width:0}
+.metricgrid,.panelgrid,.advisor-grid,.goal-grid,.figure-grid,.history-feature,.systems-grid,.citygrid,.metriccards,.featuregrid{min-width:0}
+
+@media (max-width: 900px){
+  .top{padding-inline:14px}
+  .topmetrics{overflow:hidden}
+  .game{grid-template-columns:72px minmax(0,1fr)}
+  .sidebar{padding:9px 6px}
+  .nav{min-height:44px}
+  .main{min-width:0}
+  .right{width:280px;max-width:calc(100vw - 92px)}
+  .world{height:clamp(430px,58vh,560px)}
+  .world-head{left:18px;right:18px}
+  .world-head h1{font-size:clamp(30px,4vw,42px)}
+  .content{padding:18px 18px 42px}
+  .panel{padding:16px}
+  .decision-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+
+@media (max-width: 680px){
+  html,body,#app{height:100%;overflow:hidden}
+  .top{height:60px;padding:0 10px;gap:8px}
+  .brand{font-size:12px;letter-spacing:.06em}
+  .top-right{gap:6px;min-width:0}
+  .yearbox{font-size:8px;white-space:nowrap}
+  .game{height:calc(100% - 60px);display:block;position:relative}
+  .main{height:calc(100% - 58px);overflow:auto;padding-bottom:env(safe-area-inset-bottom)}
+  .sidebar{left:0;right:0;bottom:0;top:auto;width:100%;height:58px;padding:5px max(7px,env(safe-area-inset-left)) max(5px,env(safe-area-inset-bottom));display:flex;flex-direction:row;align-items:stretch;gap:2px;border:0;border-top:1px solid var(--line);border-radius:0;overflow-x:auto;overflow-y:hidden;z-index:50;background:rgba(4,9,11,.96);backdrop-filter:blur(18px);scrollbar-width:none}
+  .sidebar::-webkit-scrollbar{display:none}
+  .nav{flex:1 0 54px;min-width:54px;height:48px;min-height:48px;padding:4px 2px;display:flex;flex-direction:column;gap:2px;justify-content:center;border-radius:7px}
+  .nav i{font-size:15px;line-height:1}
+  .nav span{display:block;font-size:6px;line-height:1.1;white-space:nowrap;color:inherit}
+  .nation-mini,.sidebottom{display:none}
+  .right{position:fixed;left:8px;right:8px;bottom:66px;top:auto;width:auto;max-width:none;max-height:42vh;z-index:45;border:1px solid var(--line);border-radius:12px;padding:10px;background:rgba(6,13,16,.96);backdrop-filter:blur(18px);box-shadow:0 12px 40px rgba(0,0,0,.45)}
+  .rightcard{padding:11px;margin-bottom:7px}
+  .rightcard.next{display:block}
+  .rightcard:not(.next){display:none}
+  .world{height:clamp(410px,62svh,540px);min-height:410px}
+  .world-head{left:14px;right:14px;top:14px}
+  .world-head h1{font-size:27px;margin-top:6px}
+  .world-head p{font-size:9px;max-width:68vw}
+  .world-actions{display:none}
+  .layerbar{left:12px;right:12px;bottom:12px;gap:5px;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;padding-bottom:2px}
+  .layerbar::-webkit-scrollbar{display:none}
+  .layerbar button{flex:0 0 auto;min-height:42px;padding:8px 11px;white-space:nowrap}
+  .map-maturity{left:12px;bottom:63px;max-width:calc(100% - 24px);padding:7px 9px;gap:6px;font-size:8px}
+  .map-maturity b{min-width:82px;font-size:8px}
+  .map-maturity i{width:65px}
+  .content{padding:14px 11px 34px}
+  .sectionhead{align-items:flex-start;gap:10px;flex-direction:column;margin-bottom:13px}
+  .sectionhead h2{font-size:21px}
+  .panelgrid,.creator-grid,.slidergrid,.advisor-grid,.goal-grid,.figure-grid,.history-feature,.systems-grid,.citygrid,.metriccards,.featuregrid{grid-template-columns:1fr!important}
+  .metricgrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .metricgrid .metric{padding:10px}
+  .consequence-row{grid-template-columns:1fr 1fr}
+  .turn-banner{padding:13px;gap:10px}
+  .turn-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:8px}
+  .turn-stats span{min-width:0;padding:7px;border:1px solid var(--line);border-radius:7px;background:rgba(255,255,255,.018)}
+  .decision-grid{grid-template-columns:1fr!important;gap:7px!important}
+  .decision-grid button{min-height:60px!important}
+  .neighbor-list>div{grid-template-columns:1fr 42px 72px!important;gap:5px}
+  .news span{font-size:9px}
+  .panel h2{font-size:24px}
+  .panel p{font-size:10px}
+  .widebtn{min-height:46px}
+  .creator{padding-bottom:30px}
+}
+
+@media (max-width:390px){
+  .brand{font-size:10px}
+  .yearbox{display:none}
+  .world{height:430px;min-height:430px}
+  .world-head h1{font-size:24px}
+  .world-head p{font-size:8px}
+  .nav{flex-basis:50px;min-width:50px}
+  .nav span{font-size:5.5px}
+  .metricgrid{grid-template-columns:1fr 1fr}
+  .consequence-row{grid-template-columns:1fr}
+  .map-maturity{display:none}
+}
+
+@media (pointer: coarse){
+  .nav:hover,.world-actions button:hover,.layerbar button:hover,.decision-grid button:hover:not(:disabled){transform:none}
+  .nav,.world-actions button,.layerbar button,.decision-grid button,.neighbor-list button{user-select:none}
+}

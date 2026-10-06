@@ -391,9 +391,15 @@ function createScene(){
    renderer.domElement.addEventListener('pointerdown',onWorldClick);
    renderer.domElement.addEventListener('wheel',onWheel,{passive:true});
    let drag=false,lastX=0;
-   renderer.domElement.addEventListener('pointerdown',e=>{drag=true;lastX=e.clientX;renderer.domElement.setPointerCapture?.(e.pointerId)});
-   renderer.domElement.addEventListener('pointerup',e=>{drag=false;renderer.domElement.releasePointerCapture?.(e.pointerId)});
-   renderer.domElement.addEventListener('pointermove',e=>{if(drag&&worldGroup){worldGroup.rotation.y+=(e.clientX-lastX)*.006;lastX=e.clientX}});
+   const worldPointers=new Map(); let pinchDistance=0;
+   renderer.domElement.addEventListener('pointerdown',e=>{worldPointers.set(e.pointerId,e);drag=worldPointers.size===1;lastX=e.clientX;renderer.domElement.setPointerCapture?.(e.pointerId);if(worldPointers.size===2){const pts=[...worldPointers.values()];pinchDistance=Math.hypot(pts[0].clientX-pts[1].clientX,pts[0].clientY-pts[1].clientY)}});
+   renderer.domElement.addEventListener('pointerup',e=>{worldPointers.delete(e.pointerId);drag=false;renderer.domElement.releasePointerCapture?.(e.pointerId)});
+   renderer.domElement.addEventListener('pointercancel',e=>{worldPointers.delete(e.pointerId);drag=false});
+   renderer.domElement.addEventListener('pointermove',e=>{
+     worldPointers.set(e.pointerId,e);
+     if(worldPointers.size===2){const pts=[...worldPointers.values()];const d=Math.hypot(pts[0].clientX-pts[1].clientX,pts[0].clientY-pts[1].clientY);if(pinchDistance){camera.position.z=THREE.MathUtils.clamp(camera.position.z-(d-pinchDistance)*0.012,7,24)}pinchDistance=d;drag=false;return}
+     if(drag&&worldGroup){worldGroup.rotation.y+=(e.clientX-lastX)*.006;worldGroup.rotation.x=THREE.MathUtils.clamp(worldGroup.rotation.x+(e.clientY-(lastY||e.clientY))*.003,-.55,.55);lastX=e.clientX;lastY=e.clientY}
+   });
    if(resizeObserver)resizeObserver.disconnect();
    if(window.ResizeObserver){resizeObserver=new ResizeObserver(()=>{
      if(host.clientWidth&&renderer&&camera){
