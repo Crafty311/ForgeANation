@@ -263,10 +263,10 @@ function initLandingGlobe(){
  const nodeMat=new THREE.PointsMaterial({color:0xd4ffff,size:.065,transparent:true,opacity:.9,depthWrite:false,blending:THREE.AdditiveBlending});
  landingGlobe.add(new THREE.Points(nodeGeo,nodeMat));
 
- landingComposer=new EffectComposer(landingRenderer);
- landingComposer.addPass(new RenderPass(landingScene,landingCamera));
- landingBloom=new UnrealBloomPass(new THREE.Vector2(w,h),.7,.75,.72);
- landingComposer.addPass(landingBloom);
+ // Keep the landing renderer genuinely transparent. The bloom composer used by the game
+ // writes an opaque post-processing target, which would create a black rectangle here.
+ landingComposer=null;
+ landingBloom=null;
 
  let targetX=0,targetY=0,dragging=false,lastX=0,lastY=0;
  host.addEventListener('pointermove',e=>{const r=host.getBoundingClientRect();targetY=((e.clientX-r.left)/r.width-.5)*.45;targetX=((e.clientY-r.top)/r.height-.5)*.25;if(dragging){landingGlobe.rotation.y+=(e.clientX-lastX)*.005;landingGlobe.rotation.x+=(e.clientY-lastY)*.005;lastX=e.clientX;lastY=e.clientY}});
@@ -274,12 +274,12 @@ function initLandingGlobe(){
  host.addEventListener('pointerup',e=>{dragging=false;host.releasePointerCapture?.(e.pointerId)});
  host.addEventListener('pointerleave',()=>{dragging=false});
 
- landingResize=()=>{const ww=Math.max(1,host.clientWidth),hh=Math.max(1,host.clientHeight);landingCamera.aspect=ww/hh;landingCamera.updateProjectionMatrix();const aspect=Math.max(.35,ww/hh);const vfov=THREE.MathUtils.degToRad(landingCamera.fov);const fit=Math.max(1,1/aspect);landingCamera.position.z=(2.34/(Math.tan(vfov/2)/fit))*1.12;landingRenderer.setSize(ww,hh,false);landingComposer.setSize(ww,hh)};
+ landingResize=()=>{const ww=Math.max(1,host.clientWidth),hh=Math.max(1,host.clientHeight);landingCamera.aspect=ww/hh;landingCamera.updateProjectionMatrix();const aspect=Math.max(.35,ww/hh);const vfov=THREE.MathUtils.degToRad(landingCamera.fov);const fit=Math.max(1,1/aspect);landingCamera.position.z=(2.34/(Math.tan(vfov/2)/fit))*1.12;landingRenderer.setSize(ww,hh,false);};
  window.addEventListener('resize',landingResize);
  const animate=()=>{
    landingFrame=requestAnimationFrame(animate);
    if(!dragging){landingGlobe.rotation.y+=.0017;landingGlobe.rotation.x+=(targetX*.35-landingGlobe.rotation.x)*.025;landingGlobe.rotation.z+=(-.16-targetY*.18-landingGlobe.rotation.z)*.018}
-   landingComposer.render();
+   landingRenderer.render(landingScene,landingCamera);
  };
  animate();
 }
