@@ -1,26 +1,35 @@
-# Forge a Nation — V5.4
+# Forge a Nation V6 — Simulation Core
 
-V5.4 expands the V5.3 simulation without replacing its map/UI foundation.
+V6 keeps the V5.6 visual foundation and landing globe, but replaces the click-only progression with a real turn-based nation simulation.
 
-## Simulation
-- Economic sectors, treasury, tax pressure and public spending
-- Demographic/social groups with different reactions to policy
-- City specialization and city-level investment projects
-- Trade balance and neighbor relationships
-- Military capability and deterrence
-- Persistent events with player responses and consequences
-- Richer national history and progression XP
-- Reactive 3D spatial data field around the existing nation map
+## Core loop
 
-## 3D / UI
-- Three.js post-processing bloom
-- Procedural orbital metric rings and data nodes
-- Spatial HUD labels for population/economy/military layers
-- Existing city/building world preserved
-- Navigation updates the active content state without a browser-style page refresh
+Observe pressure → spend limited government actions → commit resources → advance the year → resolve consequences → adapt.
 
-## Deployment
-The Vercel build script invokes Vite through Node directly, avoiding executable-bit issues with `node_modules/.bin/vite` in restricted build environments.
+### New simulation systems
+- 3 government actions per year
+- Real treasury costs and fiscal balance
+- Multi-year construction projects
+- Supply pressure for food, water, energy and housing
+- Inflation and cost-of-living pressure
+- Employment and urbanization feedback
+- Political group support
+- Emerging crises based on actual national conditions
+- Crisis response choices with real trade-offs
+- Trade and diplomatic action costs
+- City investment costs and action limits
+- Rail, megaproject, energy, culture, museum and festival decisions are implemented
+- Persistent project/history/news records
+- V6 save format with fallback migration from the previous save
 
-## Landing visual reference
-The start-page globe is a native Three.js implementation inspired by ThreeUI's "Globe — Network Globe" visual language (dotted globe, routes, glow, interaction). The existing game-world renderer is unchanged. Reference: https://threeui.com/backgrounds/
+## Preserved
+- Landing-page ThreeUI-inspired matrix globe
+- Nation creator
+- Existing 3D world/map
+- Existing navigation and visual system
+- No multiplayer changes
+
+## Verification
+- `node --check src/main.js` passes.
+- ZIP integrity checked after packaging.
+- Full Vite browser build was not run in this environment because dependencies are not installed here.

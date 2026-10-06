@@ -159,3 +159,12 @@ html,body{overflow:hidden;height:100%;overscroll-behavior:none}
   .creator-foot{gap:18px;align-items:stretch;flex-direction:column}
   #forge-nation-btn{width:100%}
 }
+
+
+/* V6 simulation layer: decisions have cost, capacity and consequence. */
+.turn-banner{grid-column:1/-1;display:flex;justify-content:space-between;gap:18px;align-items:center;padding:16px 18px;border:1px solid rgba(140,229,232,.2);border-radius:12px;background:linear-gradient(110deg,rgba(140,229,232,.07),rgba(7,16,20,.92));position:relative;overflow:hidden}
+.turn-banner:after{content:"";position:absolute;inset:auto -10% -70% 35%;height:120px;background:radial-gradient(circle,rgba(140,229,232,.09),transparent 65%);pointer-events:none}
+.turn-banner small{font:7px var(--font-data);color:var(--accent);letter-spacing:.14em}.turn-banner h3{font-size:18px;margin:5px 0}.turn-banner p{font-size:9px;color:#8da4a6;margin:0;max-width:650px;line-height:1.45}.turn-stats{display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end}.turn-stats span{display:grid;gap:4px;font:7px var(--font-data);color:#718a8d}.turn-stats b{font-size:11px;color:#dceceb}
+.decision-panel{position:relative}.decision-panel>div:first-child p{margin:6px 0 0;max-width:620px;font-size:9px;line-height:1.5;color:#7f9799}.decision-grid button{display:flex!important;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;min-height:66px!important;text-align:left}.decision-grid button strong{font-size:10px;color:#dceceb}.decision-grid button small{font:7px var(--font-data);color:#718a8d}.decision-grid button:hover:not(:disabled){border-color:rgba(140,229,232,.45);transform:translateY(-1px)}.decision-grid button:disabled{opacity:.34;cursor:not-allowed;filter:saturate(.45)}
+.neighbor-list button:disabled{opacity:.35;cursor:not-allowed}.project-strip span{position:relative}.project-strip span:after{content:"";display:block;height:3px;margin-top:5px;border-radius:99px;background:linear-gradient(90deg,var(--accent),rgba(140,229,232,.08));opacity:.65}
+@media(max-width:760px){.turn-banner{align-items:flex-start;flex-direction:column}.turn-stats{justify-content:flex-start}.turn-stats span{min-width:75px}.turn-banner h3{font-size:16px}}
