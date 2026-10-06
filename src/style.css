@@ -52,7 +52,7 @@ button{transition:transform .22s cubic-bezier(.2,.8,.2,1),border-color .22s,back
 html,body,#app{font-family:var(--font-ui);font-synthesis:none}
 small,.world-head small,.sectionhead small,.panel>small,.rightcard>small,.creator-head small,.flowtitle,.landing-copy>small,.nation-mini span,.metric span,.metric em,.statcard small,.statcard span,.world-hint,.mini-legend,.topmetrics,.yearbox,.landing-note{font-family:var(--font-data)}
 .game{grid-template-columns:176px minmax(0,1fr) 248px}
-.sidebar{padding:12px 8px;gap:2px;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:rgba(140,229,232,.18) transparent;overscroll-behavior:contain}.sidebar::-webkit-scrollbar{width:8px}.sidebar::-webkit-scrollbar-track{background:transparent}.sidebar::-webkit-scrollbar-thumb{background:rgba(140,229,232,.18);border-radius:99px;border:2px solid transparent;background-clip:padding-box}.sidebar::-webkit-scrollbar-thumb:hover{background:rgba(140,229,232,.32);background-clip:padding-box}
+.sidebar{padding:12px 8px;gap:2px;overflow:auto;scrollbar-width:thin}
 .nation-mini{padding:11px;margin-bottom:8px}
 .nav{gap:10px;padding:9px 9px}
 .nav span{font-size:11px}
@@ -90,10 +90,6 @@ small,.world-head small,.sectionhead small,.panel>small,.rightcard>small,.creato
 @media(max-width:760px){.world{height:530px;min-height:530px}.world-head h1{font-size:30px}.layerbar{left:14px;right:14px;bottom:14px}.city-copy b{font-size:8px}.city-copy small{font-size:6px}.city-popbar{width:62px}.sidebar{overflow:visible}}
 
 /* V5.3 interaction polish: navigation changes state without the hard visual jump of a page refresh. */
-html,body{overflow:hidden;height:100%;overscroll-behavior:none}
-.main{overscroll-behavior:contain}
-.nav-enter{animation:nav-enter .2s cubic-bezier(.2,.8,.2,1)}
-@keyframes nav-enter{from{opacity:.82;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 ::view-transition-old(root),::view-transition-new(root){animation-duration:.22s;animation-timing-function:cubic-bezier(.2,.8,.2,1)}
 ::view-transition-old(root){animation-name:forge-out}
 ::view-transition-new(root){animation-name:forge-in}
