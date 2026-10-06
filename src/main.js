@@ -190,8 +190,16 @@ function initLandingGlobe(){
  disposeLandingScene();
  const w=Math.max(1,host.clientWidth),h=Math.max(1,host.clientHeight);
  landingScene=new THREE.Scene();
- landingCamera=new THREE.PerspectiveCamera(32,w/h,.1,100);
- landingCamera.position.set(0,0,7.2);
+ landingCamera=new THREE.PerspectiveCamera(38,w/h,.1,100);
+ const frameLandingCamera=()=>{
+   const aspect=Math.max(.35,w/h);
+   const vfov=THREE.MathUtils.degToRad(landingCamera.fov);
+   const fit=Math.max(1,1/aspect);
+   const required=2.34/(Math.tan(vfov/2)/fit);
+   landingCamera.position.set(0,0,required*1.12);
+   landingCamera.lookAt(0,0,0);
+ };
+ frameLandingCamera();
  landingCamera.lookAt(0,0,0);
  landingRenderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});
  landingRenderer.setPixelRatio(Math.min(1.7,window.devicePixelRatio||1));
@@ -264,7 +272,7 @@ function initLandingGlobe(){
  host.addEventListener('pointerup',e=>{dragging=false;host.releasePointerCapture?.(e.pointerId)});
  host.addEventListener('pointerleave',()=>{dragging=false});
 
- landingResize=()=>{const ww=Math.max(1,host.clientWidth),hh=Math.max(1,host.clientHeight);landingCamera.aspect=ww/hh;landingCamera.updateProjectionMatrix();landingRenderer.setSize(ww,hh,false);landingComposer.setSize(ww,hh)};
+ landingResize=()=>{const ww=Math.max(1,host.clientWidth),hh=Math.max(1,host.clientHeight);landingCamera.aspect=ww/hh;landingCamera.updateProjectionMatrix();const aspect=Math.max(.35,ww/hh);const vfov=THREE.MathUtils.degToRad(landingCamera.fov);const fit=Math.max(1,1/aspect);landingCamera.position.z=(2.34/(Math.tan(vfov/2)/fit))*1.12;landingRenderer.setSize(ww,hh,false);landingComposer.setSize(ww,hh)};
  window.addEventListener('resize',landingResize);
  const animate=()=>{
    landingFrame=requestAnimationFrame(animate);
