@@ -370,3 +370,7 @@ button,.btn,.primary,.nav,.world-actions button,.layerbar button,.decision-grid 
 
 /* V6.5.3 subtle creator credits */
 .creator-credit{margin-top:14px;color:#4f686b;font:7px var(--font-data);letter-spacing:.05em;opacity:.78}.creator-credit-bottom{text-align:right;margin-top:16px}.sidebar-credit{margin-top:auto;padding:12px 9px 3px;border-top:1px solid rgba(190,230,232,.07);color:#4f686b;font:7px var(--font-data);line-height:1.7;letter-spacing:.04em;opacity:.7}.sidebar-credit span{color:#456064}@media(max-width:680px){.creator-credit{font-size:7px;line-height:1.7}.creator-credit-bottom{text-align:center;margin-top:14px}.sidebar-credit{display:none}}@media(max-width:390px){.creator-credit{font-size:6.5px}}
+
+/* Instagram credit links */
+.sidebar-credit a,.creator-credit a{color:inherit;text-decoration:none}
+.sidebar-credit a:hover,.creator-credit a:hover{text-decoration:underline}
