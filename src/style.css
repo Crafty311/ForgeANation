@@ -34,3 +34,61 @@
 @media(max-width:650px){
   .hero{height:650px}.hero>img{object-position:58% center}.heroContent{left:14px;top:22px}.welcome h1{font-size:42px}.nationcard,.continue{width:100%;max-width:390px}.metrics{left:14px;right:14px;bottom:116px}.away{left:14px;right:14px;top:auto;bottom:12px;width:auto}.dashboardgrid{padding:9px}.cityimage{height:145px}
 }
+
+/* V7.5 mobile-first correction: preserve the desktop reference composition while giving phones their own layout. */
+.metric{min-width:0;overflow:hidden}.metric .uiicon{flex:0 0 22px}.metric div{min-width:0;overflow:hidden}.metric strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.metric small{overflow:hidden;text-overflow:ellipsis}
+.cityimage img,.citylarge img{background:#0a2231}
+
+@media (max-width:650px){
+  body{overflow-x:hidden}
+  .game{display:block;min-height:100svh;padding-bottom:70px}
+  .topbar{height:58px;padding:0 8px;position:sticky;top:0;display:flex;justify-content:stretch}
+  .mobilebrand{display:block;font-family:Georgia,serif;font-size:11px;line-height:1;margin-right:7px;width:74px;flex:0 0 74px;color:#e8e2cf}
+  .topstats{flex:1;min-width:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
+  .topstat{height:48px;min-width:0!important;padding:0 5px;gap:4px;border-left:1px solid rgba(139,166,179,.12);overflow:hidden}
+  .topstat .uiicon{font-size:14px;width:18px;height:18px;flex:0 0 18px}
+  .topstat b{font-size:11px;line-height:1.05;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .topstat small{font-size:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .topstats .topstat:nth-child(3){display:flex}
+  .datebox{display:none}
+
+  .hero{height:800px;min-height:800px}
+  .hero>img{object-position:58% center}
+  .heroShade{background:linear-gradient(180deg,rgba(2,13,21,.52) 0%,rgba(2,13,21,.18) 25%,rgba(2,13,21,.48) 58%,rgba(2,13,21,.94) 100%)}
+  .heroContent{left:14px;top:20px;width:calc(100% - 28px);right:14px}
+  .welcome small{font-size:13px}.welcome h1{font-size:40px;line-height:.95}.welcome p{font-size:12px;margin-bottom:14px}
+  .nationcard{width:100%;max-width:none;min-height:108px;padding:12px;gap:11px;border-radius:8px}
+  .emblem{width:52px;height:52px;flex-basis:52px;font-size:24px}
+  .nationcardbody b{font-size:16px}.nationcardbody span{font-size:11px}.nationcardbody small{font-size:10px;margin-top:5px}.bar{height:8px}.nationcardbody em{font-size:8px}
+  .continue{width:100%;max-width:none;margin-top:10px;font-size:14px;padding:11px 12px}
+
+  .metrics{position:absolute;left:14px;right:14px;top:295px;bottom:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .metric{min-height:68px;padding:9px 8px;border-radius:8px;gap:6px}
+  .metric .uiicon{font-size:17px;flex-basis:20px;width:20px}
+  .metric small{font-size:7px}.metric strong{font-size:14px}.metric em{font-size:7px}
+
+  .away{position:absolute;left:14px;right:14px;top:450px;bottom:auto;width:auto;padding:11px;border-radius:9px}
+  .away h3{font-size:14px;margin-bottom:6px}.away>div{grid-template-columns:22px 75px minmax(0,1fr);padding:6px 0;font-size:9px}.away>div b{font-size:11px}.away>div span{font-size:9px}.away .gold{margin-top:7px;padding:10px}
+
+  .dashboardgrid{display:grid;grid-template-columns:1fr!important;gap:9px;padding:9px}
+  .dashboardgrid>div{grid-column:auto!important;width:100%;min-width:0}
+  .paneltitle{height:48px}.paneltitle h2{font-size:14px}
+  .skillrow{min-height:64px;grid-template-columns:36px minmax(0,1fr) 74px;padding:7px 9px}.skillrow b{font-size:11px}.skillrow small{font-size:8px}.mini{padding:7px 5px}
+  .storeitem{min-height:67px;grid-template-columns:52px minmax(0,1fr) 57px 47px;padding:7px 8px}.storeitem img{width:52px;height:46px}.storeitem b{font-size:10px}.storeitem small{font-size:7px}.storeitem strong{font-size:9px}
+  .cityimage{height:170px}.cityhead{padding:10px 12px 3px}.citystats{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .buildingrow{grid-template-columns:32px minmax(0,1fr) 78px;min-height:48px}
+  .lowergrid{display:grid;grid-template-columns:1fr;padding:0 9px 85px;gap:9px}
+  .buildtomorrow{grid-column:auto;min-height:140px}
+  .subpage{padding:18px 10px 88px}.pagehead h1{font-size:31px}.pagehead p{font-size:10px}
+  .citiesfull{grid-template-columns:1fr}.citylarge img{height:190px}
+  .fullstore{grid-template-columns:1fr}.bigstore{grid-template-columns:74px minmax(0,1fr) 68px}.bigstore .thumb{width:74px;height:64px}
+  .fullprogress{grid-template-columns:1fr}
+  .mapscene,.mapscene img{min-height:390px;height:390px}.mapbadges{flex-wrap:wrap}.mapscene>.gold{position:absolute}
+}
+
+@media (max-width:390px){
+  .mobilebrand{width:65px;flex-basis:65px;font-size:10px}.topstat b{font-size:10px}.topstat small{font-size:6.5px}
+  .hero{height:820px;min-height:820px}.welcome h1{font-size:37px}.metrics{top:288px}.away{top:455px}
+  .metric{min-height:65px}.metric strong{font-size:13px}.metric small{font-size:6.5px}
+  .skillrow{grid-template-columns:34px minmax(0,1fr) 70px}.storeitem{grid-template-columns:48px minmax(0,1fr) 52px 44px}.storeitem img{width:48px;height:43px}
+}
