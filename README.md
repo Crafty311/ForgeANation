@@ -1,14 +1,13 @@
-# Forge a Nation V6.4 — Living Cities
+# Forge a Nation V7.2
 
-V6.4 fixes city investment and connects city-level decisions directly to the 3D world.
+A complete 2D life-sim inspired nation-building rebuild.
 
-- City investment buttons are fully wired and guarded.
-- City state persists: development, investment count, infrastructure, industry, research, port and housing.
-- Investing in a specific city immediately changes that city's local development and visible map footprint.
-- City-specific roads and development zones grow around the selected city.
-- City buildings scale from sparse settlements to dense urban districts.
-- City population and wealth continue evolving each year.
-- City overlays show local development percentage.
-- City detail modal shows local development and investment count.
-- Legacy saves are migrated safely.
-- No multiplayer changes.
+- 2D dashboard gameplay; no gameplay 3D canvas
+- Idle income and away rewards
+- National skills, buildings, city upgrades, progression and promotions
+- Responsive mobile/desktop layout
+- V6-style interactive landing globe retained only for the starting page
+- New Nation action always available
+- Instagram credits retained
+
+Run with `npm install` then `npm run dev`.
