@@ -818,3 +818,24 @@ html{scrollbar-width:thin;scrollbar-color:#28556d #04121d}
 .sidebar .brand h1{font-size:24px!important;letter-spacing:.12em!important}
 .sidebar .brand p{display:none!important}
 @media(max-width:980px){.sidebar .brand{display:none!important}}
+
+/* V2.14 — compact top-right stats + creator credit. Day stat removed. */
+.topstats{gap:0!important;max-width:none!important}
+.topstat{min-width:108px!important;height:48px!important;padding:0 10px!important;gap:7px!important}
+.topstat .uiicon{font-size:16px!important;width:20px!important;height:20px!important;flex:0 0 20px!important}
+.topstat b{font-size:14px!important;line-height:1.05!important}
+.topstat small{font-size:8px!important;margin-top:2px!important}
+.topcredit{height:48px;display:flex;align-items:center;padding:0 0 0 14px;margin-left:5px;border-left:1px solid rgba(139,166,179,.15);font-family:Cinzel,"Trajan Pro",Georgia,serif;font-size:10px;letter-spacing:.035em;color:#8ea4b1;white-space:nowrap}
+.topcredit b{color:#f0d99a;font-size:11px;font-weight:800}
+@media(max-width:1280px) and (min-width:981px){.topstat{min-width:96px!important;padding:0 7px!important}.topcredit{padding-left:9px;font-size:9px}.topcredit b{font-size:10px}}
+@media(max-width:980px){.topcredit{display:none!important}}
+
+/* V2.14.1 top-bar credits: compact Instagram links beside the author credit. */
+.topstats .topcredit{height:58px;min-width:190px;padding-left:12px;border-left:1px solid rgba(139,166,179,.15);display:flex;align-items:center;gap:7px;white-space:nowrap;color:#aabac1;font-size:10px}
+.topstats .topcredit b{color:#e9e2cc;font-size:11px}
+.topcredit-links{display:flex;align-items:center;gap:7px;min-width:0}
+.topcredit-links a{color:#83b8d0;text-decoration:none}
+.topcredit-links a:hover{color:#a9d8ea;text-decoration:underline}
+@media(max-width:1280px) and (min-width:981px){.topstats .topcredit{min-width:150px;padding-left:9px;gap:5px;font-size:9px}.topstats .topcredit b{font-size:10px}.topcredit-links{gap:4px}.topcredit-links a{font-size:9px}}
+@media(max-width:980px){.topstats .topcredit{min-width:0;padding-left:7px;gap:4px;font-size:8px}.topstats .topcredit b{font-size:9px}.topcredit-links{gap:4px}.topcredit-links a{font-size:8px}}
+@media(max-width:650px){.topstats .topcredit{padding-left:5px;gap:3px;font-size:7px}.topstats .topcredit b{font-size:8px}.topcredit-links{gap:3px}.topcredit-links a{font-size:7px}}
