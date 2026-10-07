@@ -196,12 +196,20 @@ function failActivity(op,g){
  save();toast(`❌ ${op.icon} ${op.title} failed. This activity is unavailable today.`);renderGame();
 }
 function resolveActivityResult(result){
- const n=state.nation,z=cozyFor(n),op=activeOpportunity(n),g=z.activeGame;if(!op||!g||!result)return;
+ const n=state.nation,z=cozyFor(n),op=activeOpportunity(n),g=z.activeGame;if(!op||!g||!result||g.pendingResult)return;
  g.rounds++;
  if(result==='draw'){g.draws++;g.lastResult='draw';sfx('draw');save();renderGame();return;}
  g.lastResult=result;
- if(result==='win'){g.wins++;g.streak++;sfx('success');completeWonActivity(op,g);}
- else {g.losses++;g.streak=0;sfx('fail');failActivity(op,g);}
+ g.pendingResult=result;
+ if(result==='win'){g.wins++;g.streak++;sfx('success');}
+ else {g.losses++;g.streak=0;sfx('fail');}
+ save();renderGame();
+}
+function closeActivityResult(){
+ const n=state.nation,z=cozyFor(n),op=activeOpportunity(n),g=z.activeGame;if(!op||!g||!g.pendingResult)return;
+ const result=g.pendingResult;g.pendingResult=null;
+ if(result==='win')completeWonActivity(op,g);
+ else failActivity(op,g);
 }
 function finishOpportunity(){
  const n=state.nation,z=cozyFor(n);if(z.activeOpportunity)return toast('Win or lose the activity first.');
@@ -224,18 +232,19 @@ function tttAi(b){
  return empty[Math.floor(Math.random()*empty.length)];
 }
 function miniGameAction(action,value){
- const n=state.nation,z=cozyFor(n),g=z.activeGame;if(!g)return;let result='';
+ const n=state.nation,z=cozyFor(n),g=z.activeGame;if(!g||g.revealing)return;let result='';g.revealing=true;
  if(g.type==='rps'){
-  const choices=['rock','paper','scissors'],player=String(value),ai=choices[Math.floor(Math.random()*3)];g.rps={player,ai};result=player===ai?'draw':((player==='rock'&&ai==='scissors')||(player==='paper'&&ai==='rock')||(player==='scissors'&&ai==='paper'))?'win':'loss';
+  const choices=['rock','paper','scissors'],player=String(value),ai=choices[Math.floor(Math.random()*3)];g.rps={player,ai,revealing:true};result=player===ai?'draw':((player==='rock'&&ai==='scissors')||(player==='paper'&&ai==='rock')||(player==='scissors'&&ai==='paper'))?'win':'loss';
  }else if(g.type==='coin'){
-  const player=String(value),ai=Math.random()<.5?'heads':'tails';sfx('coin');g.coin={player,ai};result=player===ai?'win':'loss';
+  const player=String(value),ai=Math.random()<.5?'heads':'tails';sfx('coin');g.coin={player,ai,flipping:true};result=player===ai?'win':'loss';
  }else if(g.type==='fingers'){
-  const player=Math.max(0,Math.min(5,Number(value)||0)),ai=Math.floor(Math.random()*6);g.fingers={player,ai};result=player===ai?'draw':player>ai?'win':'loss';
+  const player=Math.max(0,Math.min(5,Number(value)||0)),ai=Math.floor(Math.random()*6);g.fingers={player,ai,revealing:true};result=player===ai?'draw':player>ai?'win':'loss';
  }else if(g.type==='ttt'){
-  const i=Number(value);if(!Number.isInteger(i)||i<0||i>8||g.ttt.board[i])return;
+  const i=Number(value);if(!Number.isInteger(i)||i<0||i>8||g.ttt.board[i]){g.revealing=false;return;}
   g.ttt.board[i]='X';let w=tttWinner(g.ttt.board);if(!w){const ai=tttAi(g.ttt.board);if(ai!==undefined)g.ttt.board[ai]='O';w=tttWinner(g.ttt.board)||null;}if(w){result=w==='X'?'win':w==='O'?'loss':'draw';g.ttt=freshTtt();}
  }
- if(result)resolveActivityResult(result);else{save();renderGame();}
+ if(result){save();renderGame();setTimeout(()=>{if(g.type==='coin'&&g.coin)g.coin.flipping=false;if(g.rps)g.rps.revealing=false;if(g.fingers)g.fingers.revealing=false;g.revealing=false;resolveActivityResult(result);},g.type==='coin'?1250:650);}
+ else{g.revealing=false;save();renderGame();}
 }
 function cancelOpportunity(){const n=state.nation;cozyFor(n);n.cozy.activeOpportunity=null;n.cozy.activeGame=null;n.cozy.opportunityStep=0;save();renderGame()}
 function endDay(){
@@ -317,17 +326,39 @@ function toast(msg){state.toast=msg;renderGame();clearTimeout(window.__toast);wi
 function credits(){return `<div class="credits">Made by Sajid<br><span>Instagram: <a href="https://www.instagram.com/sajidaddin" target="_blank" rel="noopener noreferrer">@sajidaddin</a> · <a href="https://www.instagram.com/sajidphobic" target="_blank" rel="noopener noreferrer">@sajidphobic</a></span></div>`;}
 function icon(s,cls=''){return `<span class="uiicon ${cls}">${s}</span>`;}
 /* Audio: CC0 ambient loop + WebAudio tactile UI layer. Browsers require the first user gesture before sound can begin. */
-const AUDIO={bg:null,ctx:null,ready:false};
+const AUDIO={ctx:null,ready:false,tracks:[],trackIndex:-1,loopsLeft:0};
+const BGM_TRACKS=[
+ {name:'Relax Background',url:'https://opengameart.org/sites/default/files/relax_background1_0.ogg'},
+ {name:'Calm Loop',url:'https://opengameart.org/sites/default/files/Relaxing_0.mp3'},
+ {name:'Calm Theme',url:'https://opengameart.org/sites/default/files/calm_theme.ogg'},
+ {name:'Simple Menu Loop',url:'https://opengameart.org/sites/default/files/simple_loop.ogg'}
+];
 function soundEnabled(){return !state.ui?.soundMuted;}
 function ensureAudio(){
  if(AUDIO.ready)return;
  AUDIO.ready=true;
  try{AUDIO.ctx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}
- if(!AUDIO.bg){AUDIO.bg=new Audio('https://opengameart.org/sites/default/files/relax_background1_0.ogg');AUDIO.bg.loop=true;AUDIO.bg.volume=.105;AUDIO.bg.preload='auto';}
- if(soundEnabled()) startMusic();
+ AUDIO.tracks=BGM_TRACKS.map(t=>{const a=new Audio(t.url);a.preload='auto';a.volume=.085;a.addEventListener('ended',advanceMusic);return a;});
+ if(soundEnabled())startMusic();
 }
-function startMusic(){if(!soundEnabled()||!AUDIO.bg)return;const p=AUDIO.bg.play();if(p?.catch)p.catch(()=>{});}
-function stopMusic(){if(!AUDIO.bg)return;AUDIO.bg.pause();}
+function pickNextTrack(){
+ if(!AUDIO.tracks.length)return null;
+ let next=Math.floor(Math.random()*AUDIO.tracks.length);
+ if(AUDIO.tracks.length>1&&next===AUDIO.trackIndex)next=(next+1)%AUDIO.tracks.length;
+ AUDIO.trackIndex=next;AUDIO.loopsLeft=1+Math.floor(Math.random()*2);return AUDIO.tracks[next];
+}
+function advanceMusic(){
+ if(!soundEnabled())return;
+ if(AUDIO.loopsLeft>1){AUDIO.loopsLeft--;const a=AUDIO.tracks[AUDIO.trackIndex];a.currentTime=0;const p=a.play();if(p?.catch)p.catch(()=>{});return;}
+ const next=pickNextTrack();if(next){const p=next.play();if(p?.catch)p.catch(()=>{});}
+}
+function startMusic(){
+ ensureAudio();if(!soundEnabled()||!AUDIO.tracks.length)return;
+ if(AUDIO.ctx?.state==='suspended')AUDIO.ctx.resume();
+ let a=AUDIO.tracks[AUDIO.trackIndex];if(!a||a.ended||a.paused&&AUDIO.trackIndex<0)a=pickNextTrack();
+ if(a){const p=a.play();if(p?.catch)p.catch(()=>{});}
+}
+function stopMusic(){AUDIO.tracks.forEach(a=>{a.pause();a.currentTime=0;});}
 function tone(freq,dur,type='sine',gain=.025,delay=0){if(!soundEnabled()||!AUDIO.ctx)return;const c=AUDIO.ctx,o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.setValueAtTime(freq,c.currentTime+delay);g.gain.setValueAtTime(.0001,c.currentTime+delay);g.gain.exponentialRampToValueAtTime(gain,c.currentTime+delay+.008);g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+delay+dur);o.connect(g).connect(c.destination);o.start(c.currentTime+delay);o.stop(c.currentTime+delay+dur+.02);}
 function sfx(kind='click'){ensureAudio();if(!soundEnabled())return;if(AUDIO.ctx?.state==='suspended')AUDIO.ctx.resume();if(kind==='click'){tone(520,.045,'sine',.018);tone(760,.025,'sine',.008,.018)}else if(kind==='open'){tone(360,.06,'sine',.018);tone(620,.09,'sine',.012,.035)}else if(kind==='success'){tone(520,.07,'sine',.025);tone(660,.08,'sine',.022,.06);tone(820,.13,'sine',.018,.13)}else if(kind==='fail'){tone(190,.11,'triangle',.025);tone(140,.16,'triangle',.018,.08)}else if(kind==='draw'){tone(430,.08,'sine',.018);tone(430,.08,'sine',.012,.11)}else if(kind==='coin'){tone(720,.035,'triangle',.012);tone(920,.035,'triangle',.012,.04);tone(1120,.06,'triangle',.01,.08)}}
 function toggleSound(){state.ui=state.ui||{};state.ui.soundMuted=!state.ui.soundMuted;save();ensureAudio();if(state.ui.soundMuted)stopMusic();else{startMusic();sfx('success')}renderGame();}
@@ -349,9 +380,19 @@ function collectionCard(){const n=state.nation,z=cozyFor(n),items=z.collection||
 function cityBuilder(){const n=state.nation,c=selectedCity(),z=cozyFor(n),defs=BUILD_DEFS;return listPage('City Builder',`${esc(c.name)} — shape the city yourself.`,`<div class="builderlayout"><section class="builderworld panel"><div class="builderhead"><div><small>${esc(c.type)}</small><h2>${esc(c.name)}</h2><p>${fmt(c.pop/1e6)}M residents · Level ${c.level} · ${Math.round(c.happiness)}% happiness</p></div><div class="builderactions"><button class="outline" data-action="road">🛣️ Extend Road</button><button class="gold" data-action="cityup">⬆ Grow City</button></div></div><div class="builder3d city3d" data-city-scene="${esc(c.name)}"></div><div class="builderstats"><span>🏠 ${c.buildings?.filter(x=>BUILD_DEFS.find(d=>d.id===x.id)?.cat==='Residential').length||0} homes</span><span>💼 ${c.buildings?.reduce((a,x)=>a+(BUILD_DEFS.find(d=>d.id===x.id)?.jobs||0),0)||0} jobs</span><span>🛣️ ${c.roads||2} road links</span><span>🌳 ${c.zones?.park||0} green zones</span></div></section><section class="buildcatalog panel"><div class="paneltitle"><h2>Build</h2><span>Place something useful</span></div><div class="buildfilters">${['All','Residential','Commercial','Civic','Industrial','Nature','Infrastructure','Culture'].map(x=>`<button class="${x==='All'?'active':''}">${x}</button>`).join('')}</div><div class="buildgrid">${defs.map(d=>{const cost=buildCost(d,c),locked=(d.id==='university'&&c.level<4)||(d.cat==='Infrastructure'&&c.level<2);return `<article class="buildcard"><div class="buildicon">${d.icon}</div><div><b>${d.name}</b><small>${d.desc}</small><em>${money(cost)} · ${d.cat}</em></div><button class="mini ${locked?'lockbtn':'greenbtn'}" data-build="${d.id}" ${locked?'disabled':''}>${locked?'🔒':'Build'}</button></article>`}).join('')}</div></section><section class="zones panel"><div class="paneltitle"><h2>Plan the city</h2><span>Reserve space</span></div><div class="zonegrid">${ZONE_DEFS.map(x=>`<button class="zonebtn" data-zone="${x.id}"><b>${x.icon} ${x.name}</b><small>${x.effect}</small><em>${c.zones?.[x.id]||0} zones</em></button>`).join('')}</div></section></div>`);}
 function miniGameMarkup(g){
  const result=g.lastResult?`<div class="game-result ${g.lastResult}">${g.lastResult==='win'?'🎉 You won!':g.lastResult==='loss'?'😅 Not this time':'🤝 Draw — go again!'}</div>`:'';
- if(g.type==='rps')return `<div class="minigame rps polished"><div class="duelstage"><div class="duelplayer"><span class="avatar">🙂</span><b>You</b><small>${g.rps?g.rps.player:'Choose'}</small></div><div class="vs">VS</div><div class="duelplayer opponent"><span class="avatar ${g.rps?'reveal':''}">${g.rps?(g.rps.ai==='rock'?'✊':g.rps.ai==='paper'?'✋':'✌️'):'?'}</span><b>Town Challenger</b><small>${g.rps?g.rps.ai:'Waiting'}</small></div></div>${result}<div class="game-instructions">Make your move. The reveal happens together.</div><div class="choicegrid polishedchoices"><button class="gamechoice" data-game-action="rps" data-game-value="rock">✊<span>Rock</span></button><button class="gamechoice" data-game-action="rps" data-game-value="paper">✋<span>Paper</span></button><button class="gamechoice" data-game-action="rps" data-game-value="scissors">✌️<span>Scissors</span></button></div></div>`;
- if(g.type==='coin')return `<div class="minigame coin polished"><div class="coinstage"><div class="coin3d ${g.coin?'flipped '+g.coin.ai:''}"><div class="coinfront">HEADS</div><div class="coinback">TAILS</div></div></div>${result}<div class="game-instructions">Call it, then watch the coin flip.</div><div class="choicegrid two polishedchoices"><button class="gamechoice" data-game-action="coin" data-game-value="heads">🙂<span>Heads</span></button><button class="gamechoice" data-game-action="coin" data-game-value="tails">🔵<span>Tails</span></button></div></div>`;
- if(g.type==='fingers')return `<div class="minigame fingers polished"><div class="duelstage fingersstage"><div class="duelplayer"><span class="handreveal">${g.fingers?['✊','☝️','✌️','🤟','🖖','🖐️'][g.fingers.player]:'🤚'}</span><b>You</b><small>${g.fingers?g.fingers.player+' fingers':'Choose'}</small></div><div class="vs">VS</div><div class="duelplayer opponent"><span class="handreveal">${g.fingers?['✊','☝️','✌️','🤟','🖖','🖐️'][g.fingers.ai]:'?'}</span><b>Town Resident</b><small>${g.fingers?g.fingers.ai+' fingers':'Waiting'}</small></div></div>${result}<div class="game-instructions">Pick a number. Highest hand wins; equal hands draw.</div><div class="fingergrid polishedchoices">${[0,1,2,3,4,5].map(i=>`<button class="gamechoice finger" data-game-action="fingers" data-game-value="${i}">${['✊','☝️','✌️','🤟','🖖','🖐️'][i]}<span>${i}</span></button>`).join('')}</div></div>`;
+ if(g.pendingResult){
+  const won=g.pendingResult==='win';
+  const title=won?'YOU WON!':'YOU LOST';
+  const subtitle=won?'Nice work — this activity is complete.':'This activity is failed for today.';
+  let detail='';
+  if(g.type==='rps'&&g.rps) detail=`<div class="resultversus"><span>You chose <b>${g.rps.player}</b></span><strong>VS</strong><span>Opponent chose <b>${g.rps.ai}</b></span></div>`;
+  if(g.type==='coin'&&g.coin) detail=`<div class="resultversus"><span>You called <b>${g.coin.player}</b></span><strong>VS</strong><span>Coin landed <b>${g.coin.ai}</b></span></div>`;
+  if(g.type==='fingers'&&g.fingers) detail=`<div class="resultversus"><span>You showed <b>${g.fingers.player}</b></span><strong>VS</strong><span>Opponent showed <b>${g.fingers.ai}</b></span></div>`;
+  return `<div class="minigame polished outcome ${won?'outcome-win':'outcome-loss'}"><div class="outcome-icon">${won?'🏆':'💭'}</div><h2>${title}</h2><p>${subtitle}</p>${detail}<button class="gold outcome-close" data-action="close-activity-result">${won?'Continue':'Close Activity'}</button></div>`;
+ }
+ if(g.type==='rps')return `<div class="minigame rps polished"><div class="duelstage"><div class="duelplayer"><span class="avatar">🙂</span><b>You</b><small>${g.rps?g.rps.player:'Choose'}</small></div><div class="vs">VS</div><div class="duelplayer opponent"><span class="avatar ${g.rps?'reveal':''}">${g.rps&&!g.rps.revealing?(g.rps.ai==='rock'?'✊':g.rps.ai==='paper'?'✋':'✌️'):'?'}</span><b>Town Challenger</b><small>${g.rps&&!g.rps.revealing?g.rps.ai:'Revealing…'}</small></div></div>${result}<div class="game-instructions">Make your move. The reveal happens together.</div><div class="choicegrid polishedchoices"><button class="gamechoice" data-game-action="rps" data-game-value="rock" ${g.revealing?'disabled':''}>✊<span>Rock</span></button><button class="gamechoice" data-game-action="rps" data-game-value="paper" ${g.revealing?'disabled':''}>✋<span>Paper</span></button><button class="gamechoice" data-game-action="rps" data-game-value="scissors" ${g.revealing?'disabled':''}>✌️<span>Scissors</span></button></div></div>`;
+ if(g.type==='coin')return `<div class="minigame coin polished"><div class="coinstage"><div class="coin3d ${g.coin?(g.coin.flipping?'flipping':'flipped '+g.coin.ai):''}"><div class="coinfront">HEADS</div><div class="coinback">TAILS</div></div></div>${result}<div class="game-instructions">Call it, then watch the coin flip.</div><div class="choicegrid two polishedchoices"><button class="gamechoice" data-game-action="coin" data-game-value="heads" ${g.revealing?'disabled':''}>🙂<span>Heads</span></button><button class="gamechoice" data-game-action="coin" data-game-value="tails" ${g.revealing?'disabled':''}>🔵<span>Tails</span></button></div></div>`;
+ if(g.type==='fingers')return `<div class="minigame fingers polished"><div class="duelstage fingersstage"><div class="duelplayer"><span class="handreveal">${g.fingers?['✊','☝️','✌️','🤟','🖖','🖐️'][g.fingers.player]:'🤚'}</span><b>You</b><small>${g.fingers?g.fingers.player+' fingers':'Choose'}</small></div><div class="vs">VS</div><div class="duelplayer opponent"><span class="handreveal">${g.fingers&&!g.fingers.revealing?['✊','☝️','✌️','🤟','🖖','🖐️'][g.fingers.ai]:'?'}</span><b>Town Resident</b><small>${g.fingers&&!g.fingers.revealing?g.fingers.ai+' fingers':'Revealing…'}</small></div></div>${result}<div class="game-instructions">Pick a number. Highest hand wins; equal hands draw.</div><div class="fingergrid polishedchoices">${[0,1,2,3,4,5].map(i=>`<button class="gamechoice finger" data-game-action="fingers" data-game-value="${i}" ${g.revealing?'disabled':''}>${['✊','☝️','✌️','🤟','🖖','🖐️'][i]}<span>${i}</span></button>`).join('')}</div></div>`;
  return `<div class="minigame ttt polished"><div class="ttthead"><span>You <b>X</b></span><span>Town <b>O</b></span></div>${result}<div class="game-instructions">Place X. The town responds immediately.</div><div class="tttboard polishedboard">${g.ttt.board.map((v,i)=>`<button class="tttcell ${v?'filled '+v.toLowerCase():''}" data-game-action="ttt" data-game-value="${i}" ${v?'disabled':''}>${v||''}</button>`).join('')}</div></div>`;
 }
 function opportunityCard(){
@@ -890,7 +931,7 @@ function renderCreator(){disposeLanding();$('#app').innerHTML=`<main class="crea
 let navSwipe=false,navStartX=0,navStartY=0;
 document.addEventListener('touchstart',e=>{const nav=e.target.closest('.sidebar nav');if(!nav)return;const t=e.touches[0];navSwipe=false;navStartX=t.clientX;navStartY=t.clientY;},{passive:true});
 document.addEventListener('touchmove',e=>{const nav=e.target.closest('.sidebar nav');if(!nav)return;const t=e.touches[0];if(Math.abs(t.clientX-navStartX)>10&&Math.abs(t.clientX-navStartX)>Math.abs(t.clientY-navStartY))navSwipe=true;},{passive:true});
-document.addEventListener('click',e=>{if(e.isTrusted){ensureAudio();if(!e.target.closest('[data-action=toggle-sound]'))sfx('click');}if(navSwipe&&e.target.closest('.sidebar nav')){navSwipe=false;e.preventDefault();e.stopPropagation();return;}const b=e.target.closest('[data-screen],[data-action],[data-skill],[data-buy],[data-moment],[data-opportunity],[data-build],[data-zone],[data-city-visit],[data-game-action]');if(!b)return;if(b.dataset.screen){state.screen=b.dataset.screen;state.ui=state.ui||{};state.ui.mobileNav=false;save();renderGame();return}if(b.dataset.skill){upgradeSkill(b.dataset.skill);return}if(b.dataset.buy){buyAsset(b.dataset.buy);return}if(b.dataset.moment){return}if(b.dataset.opportunity){beginOpportunity(b.dataset.opportunity);return}if(b.dataset.gameAction){miniGameAction(b.dataset.gameAction,b.dataset.gameValue);return}if(b.dataset.build){buildInCity(b.dataset.build);return}if(b.dataset.zone){zoneCity(b.dataset.zone);return}if(b.dataset.cityVisit){visitCity(Number(b.dataset.cityVisit));return}if(b.dataset.screen==='cities'&&e.target.closest('[data-city-select]'))return;const a=b.dataset.action;if(a==='toggle-sound'){toggleSound();return}if(a==='toggle-sidebar'){state.ui=state.ui||{};if(window.innerWidth<=980){state.ui.mobileNav=!state.ui.mobileNav;}else{state.ui.sidebarCollapsed=!state.ui.sidebarCollapsed;}save();renderGame();return}if(a==='close-mobile-nav'){state.ui.mobileNav=false;save();renderGame();return}if(a==='end-day'){endDay();return}if(a==='create')renderCreator();else if(a==='new')newNation();else if(a==='backlanding'){state.screen='landing';showLanding();}else if(a==='cityup')upgradeCity();else if(a==='collect')collectAway();else if(a==='continue')continuePlaying();else if(a==='road')addRoadToCity();else if(a==='cityup')upgradeCity();else if(a==='open-city-builder'){chooseCity(Number(b.dataset.cityIndex)||0);state.screen='citybuilder';save();renderGame();}else if(a==='advance-opportunity')advanceOpportunity();else if(a==='finish-opportunity')finishOpportunity();else if(a==='cancel-opportunity')cancelOpportunity();else if(a==='forge')createNation();else if(a==='save'){save();toast('Game saved');}});
+document.addEventListener('click',e=>{if(e.isTrusted){ensureAudio();if(!e.target.closest('[data-action=toggle-sound]'))sfx('click');}if(navSwipe&&e.target.closest('.sidebar nav')){navSwipe=false;e.preventDefault();e.stopPropagation();return;}const b=e.target.closest('[data-screen],[data-action],[data-skill],[data-buy],[data-moment],[data-opportunity],[data-build],[data-zone],[data-city-visit],[data-game-action]');if(!b)return;if(b.dataset.screen){state.screen=b.dataset.screen;state.ui=state.ui||{};state.ui.mobileNav=false;save();renderGame();return}if(b.dataset.skill){upgradeSkill(b.dataset.skill);return}if(b.dataset.buy){buyAsset(b.dataset.buy);return}if(b.dataset.moment){return}if(b.dataset.opportunity){beginOpportunity(b.dataset.opportunity);return}if(b.dataset.gameAction){miniGameAction(b.dataset.gameAction,b.dataset.gameValue);return}if(b.dataset.build){buildInCity(b.dataset.build);return}if(b.dataset.zone){zoneCity(b.dataset.zone);return}if(b.dataset.cityVisit){visitCity(Number(b.dataset.cityVisit));return}if(b.dataset.screen==='cities'&&e.target.closest('[data-city-select]'))return;const a=b.dataset.action;if(a==='toggle-sound'){toggleSound();return}if(a==='close-activity-result'){closeActivityResult();return}if(a==='toggle-sidebar'){state.ui=state.ui||{};if(window.innerWidth<=980){state.ui.mobileNav=!state.ui.mobileNav;}else{state.ui.sidebarCollapsed=!state.ui.sidebarCollapsed;}save();renderGame();return}if(a==='close-mobile-nav'){state.ui.mobileNav=false;save();renderGame();return}if(a==='end-day'){endDay();return}if(a==='create')renderCreator();else if(a==='new')newNation();else if(a==='backlanding'){state.screen='landing';showLanding();}else if(a==='cityup')upgradeCity();else if(a==='collect')collectAway();else if(a==='continue')continuePlaying();else if(a==='road')addRoadToCity();else if(a==='cityup')upgradeCity();else if(a==='open-city-builder'){chooseCity(Number(b.dataset.cityIndex)||0);state.screen='citybuilder';save();renderGame();}else if(a==='advance-opportunity')advanceOpportunity();else if(a==='finish-opportunity')finishOpportunity();else if(a==='cancel-opportunity')cancelOpportunity();else if(a==='forge')createNation();else if(a==='save'){save();toast('Game saved');}});
 document.addEventListener('change',e=>{const s=e.target.closest('[data-city-select]');if(s){chooseCity(Number(s.value));}});
 setInterval(()=>{if(state.nation){tick();save();}},1000);
 if(state.nation)showGame();else showLanding();
