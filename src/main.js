@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 const KEY='forgeNationV80';
+const SAVE_KEYS=['forgeNationV80','forgeNationV81','forgeNationSave'];
 const OLD_KEYS=['forgeNationV80','forgeNationV74','forgeNationV73','forgeNationV72','forgeNationV71','forgeNationV70'];
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -236,7 +237,7 @@ function miniGameAction(action,value){
  if(g.type==='rps'){
   const choices=['rock','paper','scissors'],player=String(value),ai=choices[Math.floor(Math.random()*3)];g.rps={player,ai,revealing:true};result=player===ai?'draw':((player==='rock'&&ai==='scissors')||(player==='paper'&&ai==='rock')||(player==='scissors'&&ai==='paper'))?'win':'loss';
  }else if(g.type==='coin'){
-  const player=String(value),ai=Math.random()<.5?'heads':'tails';sfx('coin');g.coin={player,ai,flipping:true};result=player===ai?'win':'loss';
+  const player=String(value),ai=(window.crypto?.getRandomValues ? (window.crypto.getRandomValues(new Uint32Array(1))[0] % 2 ? 'heads' : 'tails') : (Math.random()<.5?'heads':'tails'));sfx('coin');g.coin={player,ai,flipping:true};result=player===ai?'win':'loss';
  }else if(g.type==='fingers'){
   const player=Math.max(0,Math.min(5,Number(value)||0)),ai=Math.floor(Math.random()*6);g.fingers={player,ai,revealing:true};result=player===ai?'draw':player>ai?'win':'loss';
  }else if(g.type==='ttt'){
@@ -261,9 +262,12 @@ function endDay(){
 function visitCity(i){chooseCity(i);state.screen='citybuilder';save();renderGame();}
 
 let state=load();
+window.addEventListener('pagehide',()=>{try{save()}catch{}});
+window.addEventListener('beforeunload',()=>{try{save()}catch{}});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){try{save()}catch{}}});
 function load(){
   try{
-    const keys=[KEY,...OLD_KEYS,'forgeNationSave'];
+    const keys=[...SAVE_KEYS,...OLD_KEYS].filter((v,i,a)=>a.indexOf(v)===i);
     for(const k of keys){
       const raw=localStorage.getItem(k);
       if(!raw)continue;
@@ -275,6 +279,7 @@ function load(){
       }
     }
   }catch(e){ console.warn('Nation save could not be read',e); }
+  try{const raw=window.name;if(raw){const x=JSON.parse(raw);if(x?.nation)return migrate(x);}}catch(e){console.warn('Fallback nation save could not be read',e)}
   return {...defaultState};
 }
 function migrate(s){
@@ -287,7 +292,7 @@ function migrate(s){
 function save(){
   state.lastSeen=Date.now();
   const payload=JSON.stringify(state);
-  try{localStorage.setItem(KEY,payload);localStorage.setItem('forgeNationSave',payload);}catch(e){console.warn('Nation save failed',e);}
+  try{for(const k of SAVE_KEYS)localStorage.setItem(k,payload);window.name=payload;}catch(e){try{window.name=payload}catch{} console.warn('Nation save failed',e);}
 }
 function skillCost(id){const lv=state.nation.skills[id]||1,d=skillDefs.find(x=>x.id===id);return Math.round(d.base*Math.pow(1.48,lv-1));}
 function level(){let out=levels[0];for(const x of levels)if(state.nation.xp>=x.xp)out=x;return out;}
@@ -819,7 +824,7 @@ function buildCityScene(host,c,opts={}){
   const width=host.clientWidth||640,height=host.clientHeight||320;
   const scene=new THREE.Scene(),style=cityStyle(c);scene.background=new THREE.Color(style.ground);
   const camera=new THREE.PerspectiveCamera(32,width/height,.1,100);camera.position.set(9.5,7.8,11.5);camera.lookAt(0,1.2,0);
-  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});renderer.setPixelRatio(Math.min(1.5,window.devicePixelRatio||1));renderer.setSize(width,height,false);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;host.appendChild(renderer.domElement);
+  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});renderer.setPixelRatio(Math.min(1.1,window.devicePixelRatio||1));renderer.setSize(width,height,false);renderer.shadowMap.enabled=false;host.appendChild(renderer.domElement);
   scene.add(new THREE.HemisphereLight(0xb8dce4,0x10252c,1.75));const sun=new THREE.DirectionalLight(0xffe2ad,2.1);sun.position.set(5,10,4);sun.castShadow=true;scene.add(sun);
   const group=new THREE.Group();scene.add(group);
   const ground=new THREE.Mesh(new THREE.PlaneGeometry(22,18),new THREE.MeshStandardMaterial({color:style.ground,roughness:1}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;group.add(ground);
@@ -938,7 +943,7 @@ function buildNationalScene(host){
   const rec={renderer,scene,camera,group:world,host};
   citySceneRecords.push(rec); return rec;
 }
-function initCityScenes(){disposeCityScenes();if(!state.nation)return;$$('[data-city-scene]').forEach(host=>{const name=host.dataset.cityScene;const c=state.nation.cities.find(x=>x.name===name);if(c)buildCityScene(host,c)});const nationHost=$('#nation-city-scene');if(nationHost){buildNationalScene(nationHost);}const animate=()=>{if(!citySceneRecords.length)return;citySceneRecords.forEach(r=>{if(r.group&&r.host.offsetWidth>0&&r.host.offsetHeight>0){r.group.rotation.y+=.0007;const people=r.group.getObjectByName('Citizens');if(people){people.children.forEach((p,j)=>{const t=performance.now()*p.userData.speed+p.userData.phase;p.position.set(Math.cos(t)*p.userData.radius*.72,.03,Math.sin(t)*p.userData.radius*.52);p.rotation.y=-t+Math.PI/2;});}r.renderer.render(r.scene,r.camera)}});window.__cityFrame=requestAnimationFrame(animate)};cancelAnimationFrame(window.__cityFrame);window.__cityFrame=requestAnimationFrame(animate)}
+function initCityScenes(){disposeCityScenes();if(!state.nation)return;const hosts=$$('[data-city-scene]');const primary=hosts.slice(0,2);primary.forEach(host=>{const name=host.dataset.cityScene;const c=state.nation.cities.find(x=>x.name===name);if(c)buildCityScene(host,c)});const nationHost=$('#nation-city-scene');if(nationHost){buildNationalScene(nationHost);}const animate=()=>{if(!citySceneRecords.length)return;citySceneRecords.forEach(r=>{if(r.group&&r.host.offsetWidth>0&&r.host.offsetHeight>0){r.group.rotation.y+=.0007;const people=r.group.getObjectByName('Citizens');if(people){people.children.forEach((p,j)=>{const t=performance.now()*p.userData.speed+p.userData.phase;p.position.set(Math.cos(t)*p.userData.radius*.72,.03,Math.sin(t)*p.userData.radius*.52);p.rotation.y=-t+Math.PI/2;});}r.renderer.render(r.scene,r.camera)}});window.__cityFrame=requestAnimationFrame(animate)};cancelAnimationFrame(window.__cityFrame);window.__cityFrame=requestAnimationFrame(animate)}
 function renderGame(){tick();disposeHeroScene();const root=$('#app');let body=home();if(state.screen==='skills')body=fullSkills();else if(['store','development','buildings'].includes(state.screen))body=fullStore();else if(state.screen==='cities')body=fullCities();else if(state.screen==='citybuilder')body=cityBuilder();else if(['statistics','progress'].includes(state.screen))body=fullProgress();else if(state.screen==='map')body=fullMap();else if(state.screen==='history')body=fullHistory();else if(state.screen==='settings')body=fullSettings();else if(state.screen==='diplomacy')body=placeholder('Global Standing','Diplomacy and relations.');root.innerHTML=`<div class="game ${state.ui?.sidebarCollapsed?'sidebar-collapsed':''}"><div class="sidebarwrap">${sidebar()}</div><div class="gamearea">${topbar()}${body}</div></div>${state.toast?`<div class="toast">${esc(state.toast)}</div>`:''}`;requestAnimationFrame(()=>{initHeroScene();initCityScenes()});}
 
 let landingRenderer,landingScene,landingCamera,landingGlobe,landingFrame;
