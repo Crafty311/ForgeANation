@@ -2,8 +2,8 @@ import './style.css';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-const KEY='forgeNationV74';
-const OLD_KEYS=['forgeNationV73','forgeNationV72','forgeNationV71','forgeNationV70'];
+const KEY='forgeNationV80';
+const OLD_KEYS=['forgeNationV74','forgeNationV73','forgeNationV72','forgeNationV71','forgeNationV70'];
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const fmt=n=>new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format(n);
@@ -82,6 +82,40 @@ const storeDefs=[
  {id:'finance',name:'Financial Center',desc:'+Commerce · +Trade',cost:9500000,inc:520000,req:5,cat:'Luxury',img:'finance.svg'}
 ];
 const defaultState={screen:'landing',nation:null,lastSeen:Date.now(),toast:'',awayEarned:0};
+const cozyMoments=[
+ {id:'market',title:'Sunday Market',desc:'Set up a little market square. Citizens browse, chat and spend.',cost:180000,reward:260000,happy:3,xp:90,icon:'🧺'},
+ {id:'park',title:'Plant a Pocket Park',desc:'Give a neighborhood somewhere quiet to sit under the trees.',cost:120000,reward:0,happy:4,xp:80,icon:'🌳'},
+ {id:'cafe',title:'Open a Corner Café',desc:'A tiny café becomes a favorite meeting place.',cost:150000,reward:210000,happy:2,xp:75,icon:'☕'},
+ {id:'playground',title:'Build a Playground',desc:'Add swings and a little play space for local families.',cost:90000,reward:0,happy:3,xp:65,icon:'🛝'},
+ {id:'library',title:'Open a Neighborhood Library',desc:'Books, study tables and a warm place to spend an afternoon.',cost:220000,reward:0,happy:4,xp:110,icon:'📚'},
+ {id:'festival',title:'Lantern Evening',desc:'A small evening festival fills the streets with music and lights.',cost:250000,reward:330000,happy:6,xp:130,icon:'🏮'},
+ {id:'clean',title:'Clean-Up Day',desc:'Citizens volunteer to tidy streets and public spaces.',cost:45000,reward:0,happy:2,xp:55,icon:'🧹'},
+ {id:'street',title:'Pretty Up a Street',desc:'Fresh paving, planters and lights turn an ordinary street into a favorite walk.',cost:140000,reward:0,happy:3,xp:70,icon:'🌷'}
+];
+function dayKey(){return new Date().toISOString().slice(0,10)}
+function cozyFor(n){
+ n.cozy=n.cozy||{day:'',tasks:[],done:[],streak:0,collection:[],selectedCity:0};
+ if(n.cozy.day!==dayKey()){
+   n.cozy.day=dayKey();n.cozy.done=[];
+   const seed=hashCity(`${n.name}:${n.cozy.day}`);let a=[];
+   for(let i=0;i<3;i++)a.push(cozyMoments[(seed+i*3)%cozyMoments.length].id);
+   n.cozy.tasks=[...new Set(a)]; if(n.cozy.tasks.length<3)n.cozy.tasks.push(cozyMoments[(seed+7)%cozyMoments.length].id);
+ }
+ return n.cozy;
+}
+function selectedCity(){const n=state.nation;cozyFor(n);return n.cities[clamp(Number(n.cozy.selectedCity)||0,0,Math.max(0,n.cities.length-1))]||n.cities[0]}
+function chooseCity(i){const n=state.nation;cozyFor(n);n.cozy.selectedCity=clamp(Number(i)||0,0,n.cities.length-1);save();renderGame()}
+function doMoment(id){
+ const n=state.nation,c=selectedCity(),cfg=cozyMoments.find(x=>x.id===id);if(!cfg)return;
+ cozyFor(n);if(!n.cozy.tasks.includes(id))return toast('That moment is not on today\'s list.');if(n.cozy.done.includes(id))return toast('Already done today.');
+ if(n.money<cfg.cost)return toast(`You need ${money(cfg.cost)} for this.`);
+ n.money-=cfg.cost;n.money+=cfg.reward;n.happiness=clamp(n.happiness+cfg.happy,0,100);c.happiness=clamp((c.happiness||65)+cfg.happy,0,100);n.xp+=cfg.xp;
+ c.cozy=c.cozy||{projects:[],mood:0};c.cozy.projects.push({id,at:Date.now()});c.cozy.mood=(c.cozy.mood||0)+cfg.happy;
+ n.cozy.done.push(id);if(n.cozy.done.length===n.cozy.tasks.length)n.cozy.streak=(n.cozy.streak||0)+1;
+ n.history.unshift(`${cfg.title} brought a little life to ${c.name}.`);save();toast(`${cfg.icon} ${cfg.title} complete!`);renderGame();
+}
+function visitCity(i){chooseCity(i);state.screen='cities';save();renderGame();setTimeout(()=>document.querySelector(`[data-city-scene="${CSS.escape(state.nation.cities[i]?.name||'')}"]`)?.scrollIntoView({behavior:'smooth',block:'center'}),80)}
+
 let state=load();
 function load(){
   try{const keys=[KEY,...OLD_KEYS];for(const k of keys){const x=JSON.parse(localStorage.getItem(k));if(x?.nation){return migrate({...defaultState,...x,screen:'home'});}}}catch{}
@@ -91,7 +125,7 @@ function migrate(s){
   const n=s.nation;if(!n)return s;
   n.skills={industry:1,education:1,infrastructure:1,technology:1,health:1,commerce:1,culture:1,...n.skills};
   n.assets={...n.assets};n.cityLevel=n.cityLevel||3;n.reputation=n.reputation??32;n.happiness=n.happiness??68;n.xp=n.xp??384;n.money=n.money??12400000;n.population=n.population??1200000;n.cities=n.cities?.length?n.cities:[{name:n.name+' City',type:'Capital City',level:n.cityLevel,pop:n.population*.45,income:4800000,happiness:72}];
-  n.history=n.history||[];n.created=n.created||Date.now();n.focus=n.focus||'industrial';ensureCityVariants(n);
+  n.history=n.history||[];n.created=n.created||Date.now();n.focus=n.focus||'industrial';n.cities.forEach(c=>{c.cozy=c.cozy||{projects:[],mood:0}});cozyFor(n);ensureCityVariants(n);
   return s;
 }
 function save(){state.lastSeen=Date.now();localStorage.setItem(KEY,JSON.stringify(state));}
@@ -107,13 +141,13 @@ function createNation(){
   {name:name+' City',type:'Capital City',level:3,pop:Math.round(pop*.45*1e6),income:4800000,happiness:72,citySeed:hashCity(`${name}:${name} City`)},
   {name:'Riverbend',type:'Regional City',level:1,pop:Math.round(pop*.12*1e6),income:720000,happiness:66,citySeed:hashCity(`${name}:Riverbend`)},
   {name:'Northfield',type:'Agricultural Town',level:1,pop:Math.round(pop*.08*1e6),income:510000,happiness:69,citySeed:hashCity(`${name}:Northfield`)}
-],created:Date.now()};
+],created:Date.now(),cozy:{day:'',tasks:[],done:[],streak:0,collection:[],selectedCity:0}};
  Object.entries(focusDefs[focus].skills).forEach(([k,v])=>state.nation.skills[k]=Math.max(state.nation.skills[k],v));state.screen='home';state.lastSeen=Date.now();save();showGame();toast('Nation forged. Welcome home.');
 }
 function newNation(){if(confirm('Start a new nation? Your current nation will be replaced.')){localStorage.removeItem(KEY);state={...defaultState,screen:'landing'};showLanding();}}
 function upgradeSkill(id){const n=state.nation,c=skillCost(id),d=skillDefs.find(x=>x.id===id);if(n.money<c)return toast('You need more national wealth.');n.money-=c;n.skills[id]++;n.xp+=Math.round(c/28000)+70;n.history.unshift(`${d.name} advanced to Level ${n.skills[id]}.`);save();toast(`${d.name} upgraded`);renderGame();}
 function buyAsset(id){const n=state.nation,d=storeDefs.find(x=>x.id===id);if(!d)return;if(level().level<d.req)return toast(`Reach Level ${d.req} to unlock this.`);if(n.money<d.cost)return toast('Not enough national wealth.');n.money-=d.cost;n.assets[id]=(n.assets[id]||0)+1;n.xp+=Math.round(d.cost/20000);if(id==='stadium')n.happiness=Math.min(100,n.happiness+3);if(id==='hospital')n.happiness=Math.min(100,n.happiness+4);if(id==='finance')n.reputation+=4;n.history.unshift(`${d.name} was built in ${n.name}.`);save();toast(`${d.name} built`);renderGame();}
-function upgradeCity(){const n=state.nation,c=Math.round(1800000*Math.pow(1.55,n.cityLevel-1));if(n.money<c)return toast('Not enough wealth to upgrade this city.');n.money-=c;n.cityLevel++;n.cities[0].level=n.cityLevel;n.cities[0].pop*=1.10;n.cities[0].income+=420000;n.happiness=Math.min(100,n.happiness+1);n.xp+=Math.round(c/18000);n.history.unshift(`${n.cities[0].name} reached City Level ${n.cityLevel}.`);ensureCityVariants(n);save();toast('City upgraded');renderGame();}
+function upgradeCity(){const n=state.nation,c=selectedCity(),cost=Math.round(1800000*Math.pow(1.48,Math.max(0,(c.level||1)-1)));if(n.money<cost)return toast('Not enough wealth to upgrade this city.');n.money-=cost;c.level=(c.level||1)+1;c.pop=Math.round(c.pop*1.10);c.income=(c.income||0)+420000;c.happiness=Math.min(100,(c.happiness||65)+1);n.cityLevel=Math.max(n.cityLevel||1,c.level);n.happiness=Math.min(100,n.happiness+1);n.xp+=Math.round(cost/18000);n.history.unshift(`${c.name} reached City Level ${c.level}.`);ensureCityVariants(n);save();toast(`${c.name} grew into a larger city`);renderGame();}
 function collectAway(){tick();const e=state.nation.awayEarned||0;state.nation.awayEarned=0;save();toast(e>0?`Collected ${money(e)} while you were away`:'No pending rewards');renderGame();}
 function continuePlaying(){tick();const e=state.nation.awayEarned||0;state.nation.awayEarned=0;state.screen='home';save();renderGame();const el=document.querySelector('.dashboardgrid');el?.scrollIntoView({behavior:'smooth',block:'start'});setTimeout(()=>toast(e>0?`Welcome back — ${money(e)} collected.`:'Welcome back to your nation.'),120);}
 function toast(msg){state.toast=msg;renderGame();clearTimeout(window.__toast);window.__toast=setTimeout(()=>{state.toast='';renderGame()},2200)}
@@ -130,11 +164,12 @@ function progressCard(){const n=state.nation,l=level(),next=nextLevel();return `
 function globalCard(){return `<section class="panel global-panel"><div class="paneltitle"><h2>Global Standing</h2><button class="textbtn">View All</button></div><div class="diplomacy">${icon('◎')}<span><b>Diplomacy</b><small>Allies</small></span><b>›</b></div>${[['US','United States','Friendly +20'],['◇','Eurasia','Neutral +12'],['★','Al-Sham','Neutral +8'],['◉','Veridian','Tense -14']].map((x,i)=>`<div class="relation"><b>${x[0]}</b><span>${x[1]}</span><small class="${i===3?'bad':''}">${x[2]}</small></div>`).join('')}</section>`;}
 function achievements(){const arr=[['⌂','Factory Built','Build your first factory','+10'],['◆','University','Build a university','+10'],['◉','First Export Deal','Trade internationally','+20'],['♟','Population Milestone','Reach 1 million population','+30'],['◎','Good Relations','Form an alliance','+15']];return `<section class="panel achievements"><div class="paneltitle"><h2>Achievements</h2><button class="textbtn">View All</button></div><div class="tabs"><button class="active">All</button><button>Trade</button><button>Relations</button></div>${arr.map((x,i)=>`<div><span class="achievementicon">${x[0]}</span><section><b>${x[1]}</b><small>${x[2]}</small></section><em>${i<1&&state.nation.assets.factory?x[3]:'+'+x[3].replace('+','')}</em></div>`).join('')}</section>`;}
 function lower(){const n=state.nation,l=level();return `<section class="panel national-progress"><div class="paneltitle"><h2>National Progression</h2></div><div class="nodes">${levels.map(x=>`<div class="node ${x.level<=l.level?'done':''} ${x.level===l.level?'current':''}"><span>${x.level<=l.level?'◆':'◇'}</span><b>${x.name.replace(' Nation','')}</b><small>Lv. ${x.level}</small></div>`).join('')}</div></section><section class="panel activity"><div class="paneltitle"><h2>Recent Activity</h2></div>${n.history.slice(0,4).map((x,i)=>`<div>${icon(['◉','◆','⌂','♟'][i])}<span>${esc(x)}</span><small>${i+1}h ago</small></div>`).join('')}</section><section class="panel buildtomorrow"><img src="/hero-art.jpg" alt="Clean city illustration"><div><h2>Build a greater tomorrow</h2><p>Your decisions shape the future of ${esc(n.name)}.</p><button class="gold" data-screen="map">View Map</button></div></section>`;}
-function home(){return `<main class="maincontent">${hero()}<div class="dashboardgrid"><div>${skillsCard()}</div><div>${storeCard()}</div><div>${cityCard()}</div><div>${progressCard()}</div><div>${globalCard()}${achievements()}</div></div><div class="lowergrid">${lower()}</div></main>`;}
+function cozyCard(){const n=state.nation,c=selectedCity(),z=cozyFor(n);const tasks=z.tasks.map(id=>cozyMoments.find(x=>x.id===id)).filter(Boolean);return `<section class="panel cozy-panel"><div class="paneltitle"><div><h2>Little Things Today</h2><small>Make your nation feel lived in.</small></div><span class="streak">✦ ${z.streak||0} day streak</span></div><div class="citypick"><span>In</span><select data-city-select>${n.cities.map((x,i)=>`<option value="${i}" ${i===(z.selectedCity||0)?'selected':''}>${esc(x.name)}</option>`).join('')}</select><b>${c.happiness||65}% happy</b></div><div class="momentlist">${tasks.map(x=>{const done=z.done.includes(x.id),can=n.money>=x.cost;return `<article class="moment ${done?'done':''}"><div class="momenticon">${x.icon}</div><div><b>${x.title}</b><small>${x.desc}</small><em>${x.reward?`Earn ${money(x.reward)} · `:''}+${x.happy}% happiness</em></div><button class="mini ${done?'lockbtn':'greenbtn'}" data-moment="${x.id}" ${done||!can?'disabled':''}>${done?'Done':can?'Do it':'Need '+money(x.cost)}</button></article>`}).join('')}</div><p class="cozynote">Small choices become permanent little details in your city.</p></section>`;}
+function home(){return `<main class="maincontent">${hero()}${cozyCard()}<div class="dashboardgrid"><div>${skillsCard()}</div><div>${storeCard()}</div><div>${cityCard()}</div><div>${progressCard()}</div><div>${globalCard()}${achievements()}</div></div><div class="lowergrid">${lower()}</div></main>`;}
 function listPage(kicker,title,content){return `<main class="subpage"><div class="pagehead"><small>${kicker.toUpperCase()}</small><h1>${title}</h1><p>Manage this part of ${esc(state.nation.name)} with the same progression-driven simulation.</p></div>${content}</main>`;}
 function fullSkills(){return listPage('National Skills','Build your capabilities.',`<div class="fullskills">${skillsCard()}</div>`);}
 function fullStore(){return listPage('Development Store','Build the things that make a nation better.',`<div class="fullstore">${storeDefs.map(d=>{const n=state.nation,u=level().level>=d.req,can=n.money>=d.cost;return `<article class="bigstore"><img class="thumb" src="/${d.img}" alt=""><div><h2>${d.name}</h2><p>${d.desc}</p><small>+${money(d.inc)}/day · Requires Level ${d.req}</small></div><strong>${money(d.cost)}</strong><button class="gold" data-buy="${d.id}" ${!u||!can?'disabled':''}>${u?'Buy':'Locked'}</button></article>`}).join('')}</div>`);}
-function fullCities(){return listPage('Cities','A nation that grows city by city.',`<div class="citiesfull">${state.nation.cities.map((c,i)=>`<article class="citylarge"><div class="citylarge3d city3d" data-city-scene="${esc(c.name)}"></div><div><small>${c.type.toUpperCase()}</small><h2>${esc(c.name)}</h2><p>${fmt(c.pop/1e6)}M citizens · Level ${c.level}</p><button class="gold" data-action="cityup">Upgrade City</button></div></article>`).join('')}</div>`);}
+function fullCities(){const n=state.nation;cozyFor(n);return listPage('Cities','Visit, grow and give each place its own personality.',`<div class="citiesfull">${n.cities.map((c,i)=>`<article class="citylarge ${i===(n.cozy.selectedCity||0)?'selectedcity':''}"><div class="citylarge3d city3d" data-city-scene="${esc(c.name)}"></div><div><div class="citytag">${esc(c.type)}</div><h2>${esc(c.name)}</h2><p>${fmt(c.pop/1e6)}M citizens · Level ${c.level} · ${Math.round(c.happiness||65)}% happiness</p><div class="citychips"><span>🏠 ${Math.max(4,c.level*3)} neighborhoods</span><span>🌳 ${Math.max(1,Math.floor(c.level/2)+1)} parks</span><span>✨ ${(c.cozy?.projects||[]).length} local projects</span></div><button class="gold" data-city-visit="${i}">Visit City</button> <button class="outline" data-action="cityup">Grow City</button></div></article>`).join('')}</div>`);}
 function fullProgress(){return listPage('Nation Progression','Watch your story unfold.',`<div class="fullprogress">${levels.map(x=>`<article class="pstage ${x.level<=level().level?'done':''}"><span>Lv.${x.level}</span><h2>${x.name}</h2><p>Unlock: ${x.unlock}</p><small>${x.xp.toLocaleString()} XP</small></article>`).join('')}</div>`);}
 function fullMap(){
   const n=state.nation;
@@ -473,6 +508,37 @@ function addKenneyCityAssets(group,seed,level,opts={}){
   }).catch(()=>addFallbackCityDistrict(group,seed,lvl,opts));
 }
 
+function addCozyProjectVisuals(group,c){
+  const projects=c.cozy?.projects||[]; if(!projects.length)return;
+  const mat=(color,rough=.8)=>new THREE.MeshStandardMaterial({color,roughness:rough});
+  projects.slice(-8).forEach((p,i)=>{
+    const id=p.id, x=-4.4+(i%4)*2.8, z=3.4+Math.floor(i/4)*1.5;
+    const g=new THREE.Group();g.position.set(x,.06,z);group.add(g);
+    if(id==='park'||id==='playground'||id==='clean'||id==='street'){
+      const base=new THREE.Mesh(new THREE.BoxGeometry(1.35,.035,1.0),mat(id==='park'?0x5d855d:0x8b8b68,1));base.position.y=.02;g.add(base);
+      for(let t=0;t<3;t++){const tr=new THREE.Mesh(new THREE.CylinderGeometry(.035,.045,.28,6),mat(0x684e39,1));tr.position.set(-.42+t*.42,.18,.18);g.add(tr);const crown=new THREE.Mesh(new THREE.SphereGeometry(.18,7,6),mat([0x4f7b55,0x648d5e,0x47714f][t],1));crown.position.set(tr.position.x,.40,.18);g.add(crown);}
+      if(id==='playground'){const post=mat(0xd7a24c,1);for(const px of [-.35,.35]){const pole=new THREE.Mesh(new THREE.CylinderGeometry(.025,.025,.28,6),post);pole.position.set(px,.18,-.2);g.add(pole)}const bar=new THREE.Mesh(new THREE.BoxGeometry(.8,.035,.035),post);bar.position.set(0,.31,-.2);g.add(bar)}
+    } else if(id==='market'||id==='cafe'||id==='library'){
+      const body=new THREE.Mesh(new THREE.BoxGeometry(1.0,.55,.72),mat(id==='cafe'?0xc58b63:id==='library'?0x9b7f67:0xc4aa68,.72));body.position.y=.30;g.add(body);
+      const roof=new THREE.Mesh(new THREE.ConeGeometry(.72,.22,4),mat(id==='market'?0x9b5b52:0x596e73,.8));roof.position.y=.72;roof.rotation.y=Math.PI/4;g.add(roof);
+      if(id==='cafe'){const awning=new THREE.Mesh(new THREE.BoxGeometry(.72,.08,.18),mat(0xe1c477,.5));awning.position.set(0,.46,.42);g.add(awning)}
+      if(id==='library'){for(let j=-1;j<=1;j++){const w=new THREE.Mesh(new THREE.BoxGeometry(.12,.14,.025),mat(0xe2d6a7,.5));w.position.set(j*.2,.34,.37);g.add(w)}}
+    } else if(id==='festival'){
+      const pole=new THREE.Mesh(new THREE.CylinderGeometry(.018,.018,.75,5),mat(0x6d5944,1));pole.position.y=.38;g.add(pole);
+      for(let k=0;k<5;k++){const bulb=new THREE.Mesh(new THREE.SphereGeometry(.045,6,5),new THREE.MeshBasicMaterial({color:k%2?0xe6c96d:0x9bd7d3}));bulb.position.set(-.65+k*.32,.70,.05);g.add(bulb)}
+    }
+  });
+}
+function addAmbientCitizens(group,c){
+  const rng=seeded(hashCity(`${c.name}:citizens`)),people=new THREE.Group();people.name='Citizens';group.add(people);
+  for(let i=0;i<9;i++){
+    const p=new THREE.Group();p.userData.phase=rng()*Math.PI*2;p.userData.radius=2.0+rng()*4;p.userData.speed=.00022+rng()*.00018;p.userData.lane=i%2?'a':'b';
+    const body=new THREE.Mesh(new THREE.CylinderGeometry(.045,.055,.16,6),new THREE.MeshStandardMaterial({color:[0xd07a67,0x6f92aa,0xd0b35e,0x7c9b72][i%4],roughness:.9}));body.position.y=.16;p.add(body);
+    const head=new THREE.Mesh(new THREE.SphereGeometry(.055,7,6),new THREE.MeshStandardMaterial({color:0xd3a27e,roughness:1}));head.position.y=.29;p.add(head);
+    people.add(p);
+  }
+  people.userData.citizens=true;
+}
 function buildCityScene(host,c,opts={}){
   if(!host||!c)return null;
   const width=host.clientWidth||640,height=host.clientHeight||320;
@@ -484,6 +550,8 @@ function buildCityScene(host,c,opts={}){
   const ground=new THREE.Mesh(new THREE.PlaneGeometry(22,18),new THREE.MeshStandardMaterial({color:style.ground,roughness:1}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;group.add(ground);
   const lvl=Math.max(1,Math.min(10,c.level||1)),seed=c.citySeed||citySeed(c);
   addKenneyCityAssets(group,seed,lvl,{radius:6.4});
+  addCozyProjectVisuals(group,c);
+  addAmbientCitizens(group,c);
   // Sparse civic progression that does not use the retired placeholder building/tree library.
   if(lvl>=4){const landmark=new THREE.Mesh(new THREE.BoxGeometry(.65,1.4+lvl*.18,.65),new THREE.MeshStandardMaterial({color:style.accent,metalness:.2,roughness:.45}));landmark.position.set(0,.75+lvl*.09,0);group.add(landmark);}
   if(lvl>=6){const tower=new THREE.Mesh(new THREE.CylinderGeometry(.14,.24,2.4+lvl*.25,10),new THREE.MeshStandardMaterial({color:0xcbd9de,metalness:.35,roughness:.3}));tower.position.set(1.9,1.25+lvl*.13,-1.8);group.add(tower);}
@@ -578,7 +646,7 @@ function buildNationalScene(host){
   const rec={renderer,scene,camera,group:world,host};
   citySceneRecords.push(rec); return rec;
 }
-function initCityScenes(){disposeCityScenes();if(!state.nation)return;$$('[data-city-scene]').forEach(host=>{const name=host.dataset.cityScene;const c=state.nation.cities.find(x=>x.name===name);if(c)buildCityScene(host,c)});const nationHost=$('#nation-city-scene');if(nationHost){buildNationalScene(nationHost);}const animate=()=>{if(!citySceneRecords.length)return;citySceneRecords.forEach(r=>{if(r.group&&r.host.offsetWidth>0&&r.host.offsetHeight>0){r.group.rotation.y+=.0007;r.renderer.render(r.scene,r.camera)}});window.__cityFrame=requestAnimationFrame(animate)};cancelAnimationFrame(window.__cityFrame);window.__cityFrame=requestAnimationFrame(animate)}
+function initCityScenes(){disposeCityScenes();if(!state.nation)return;$$('[data-city-scene]').forEach(host=>{const name=host.dataset.cityScene;const c=state.nation.cities.find(x=>x.name===name);if(c)buildCityScene(host,c)});const nationHost=$('#nation-city-scene');if(nationHost){buildNationalScene(nationHost);}const animate=()=>{if(!citySceneRecords.length)return;citySceneRecords.forEach(r=>{if(r.group&&r.host.offsetWidth>0&&r.host.offsetHeight>0){r.group.rotation.y+=.0007;const people=r.group.getObjectByName('Citizens');if(people){people.children.forEach((p,j)=>{const t=performance.now()*p.userData.speed+p.userData.phase;p.position.set(Math.cos(t)*p.userData.radius*.72,.03,Math.sin(t)*p.userData.radius*.52);p.rotation.y=-t+Math.PI/2;});}r.renderer.render(r.scene,r.camera)}});window.__cityFrame=requestAnimationFrame(animate)};cancelAnimationFrame(window.__cityFrame);window.__cityFrame=requestAnimationFrame(animate)}
 function renderGame(){tick();disposeHeroScene();const root=$('#app');let body=home();if(state.screen==='skills')body=fullSkills();else if(['store','development','buildings'].includes(state.screen))body=fullStore();else if(state.screen==='cities')body=fullCities();else if(['statistics','progress'].includes(state.screen))body=fullProgress();else if(state.screen==='map')body=fullMap();else if(state.screen==='history')body=fullHistory();else if(state.screen==='settings')body=fullSettings();else if(state.screen==='diplomacy')body=placeholder('Global Standing','Diplomacy and relations.');root.innerHTML=`<div class="game"><div class="sidebarwrap">${sidebar()}</div><div class="gamearea">${topbar()}${body}</div></div>${state.toast?`<div class="toast">${esc(state.toast)}</div>`:''}`;requestAnimationFrame(()=>{initHeroScene();initCityScenes()});}
 
 let landingRenderer,landingScene,landingCamera,landingGlobe,landingFrame;
@@ -591,6 +659,7 @@ function renderCreator(){disposeLanding();$('#app').innerHTML=`<main class="crea
 let navSwipe=false,navStartX=0,navStartY=0;
 document.addEventListener('touchstart',e=>{const nav=e.target.closest('.sidebar nav');if(!nav)return;const t=e.touches[0];navSwipe=false;navStartX=t.clientX;navStartY=t.clientY;},{passive:true});
 document.addEventListener('touchmove',e=>{const nav=e.target.closest('.sidebar nav');if(!nav)return;const t=e.touches[0];if(Math.abs(t.clientX-navStartX)>10&&Math.abs(t.clientX-navStartX)>Math.abs(t.clientY-navStartY))navSwipe=true;},{passive:true});
-document.addEventListener('click',e=>{if(navSwipe&&e.target.closest('.sidebar nav')){navSwipe=false;e.preventDefault();e.stopPropagation();return;}const b=e.target.closest('[data-screen],[data-action],[data-skill],[data-buy]');if(!b)return;if(b.dataset.screen){state.screen=b.dataset.screen;save();renderGame();return}if(b.dataset.skill){upgradeSkill(b.dataset.skill);return}if(b.dataset.buy){buyAsset(b.dataset.buy);return}const a=b.dataset.action;if(a==='create')renderCreator();else if(a==='new')newNation();else if(a==='backlanding'){state.screen='landing';showLanding();}else if(a==='cityup')upgradeCity();else if(a==='collect')collectAway();else if(a==='continue')continuePlaying();else if(a==='forge')createNation();else if(a==='save'){save();toast('Game saved');}});
+document.addEventListener('click',e=>{if(navSwipe&&e.target.closest('.sidebar nav')){navSwipe=false;e.preventDefault();e.stopPropagation();return;}const b=e.target.closest('[data-screen],[data-action],[data-skill],[data-buy],[data-moment],[data-city-visit]');if(!b)return;if(b.dataset.screen){state.screen=b.dataset.screen;save();renderGame();return}if(b.dataset.skill){upgradeSkill(b.dataset.skill);return}if(b.dataset.buy){buyAsset(b.dataset.buy);return}if(b.dataset.moment){doMoment(b.dataset.moment);return}if(b.dataset.cityVisit){visitCity(Number(b.dataset.cityVisit));return}if(b.dataset.screen==='cities'&&e.target.closest('[data-city-select]'))return;const a=b.dataset.action;if(a==='create')renderCreator();else if(a==='new')newNation();else if(a==='backlanding'){state.screen='landing';showLanding();}else if(a==='cityup')upgradeCity();else if(a==='collect')collectAway();else if(a==='continue')continuePlaying();else if(a==='forge')createNation();else if(a==='save'){save();toast('Game saved');}});
+document.addEventListener('change',e=>{const s=e.target.closest('[data-city-select]');if(s){chooseCity(Number(s.value));}});
 setInterval(()=>{if(state.nation){tick();save();}},1000);
 if(state.nation)showGame();else showLanding();

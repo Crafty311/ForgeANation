@@ -28,3 +28,7 @@ https://kenney.nl/assets/retro-urban-kit
 Building Kit and Retro Urban Kit are documented in the README as candidate future district packs, but they are not falsely claimed as runtime-integrated in this build because the public runtime catalog used here does not expose those two packs. The active renderer only loads assets that can be resolved from the runtime catalog.
 
 No proprietary ThreeUI assets are included.
+
+
+# V8.0 — Cozy Nation
+Adds daily Little Things moments, city selection, local projects that persist into city visuals, ambient citizens, city-specific growth, daily streaks, and a more approachable life-sim loop. V7.13/V7.14 city and national-map foundations are preserved.
