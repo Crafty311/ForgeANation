@@ -131,14 +131,34 @@ function doMoment(id){
  if(!n.cozy.collection.includes(id)&&Math.random()<.18)n.cozy.collection.push(id);
  n.cozy.done.push(id);n.history.unshift(`${cfg.title} brought a little life to ${c.name}.`);save();toast(`${cfg.icon} ${cfg.title} complete!`);renderGame();
 }
+function startCozyDay(n){
+  n.cozy=n.cozy||{};
+  n.cozy.activityUsed=0;
+  n.cozy.done=[];
+  n.cozy.dayEnded=false;
+  n.cozy.day=dayKey();
+  const seed=hashCity(`${n.name}:${n.cozy.dayIndex}`),a=[];
+  for(let i=0;i<6;i++)a.push(cozyMoments[(seed+i*5)%cozyMoments.length].id);
+  n.cozy.tasks=[...new Set(a)];
+  n.cozy.eventId=dailyEvents[seed%dailyEvents.length].id;
+  n.cozy.mailbox=n.cozy.mailbox||[];
+}
 function endDay(){
- const n=state.nation;cozyFor(n);if(n.cozy.activityUsed<3)return toast('Do at least 3 activities before ending your day.');if(n.cozy.dayEnded)return toast('Today has already ended.');
+ const n=state.nation;cozyFor(n);
+ if(n.cozy.dayEnded)return toast('Today has already ended.');
+ if(n.cozy.activityUsed<3)return toast('Do at least 3 activities before ending your day.');
+ const endingDay=n.cozy.dayIndex;
  const ev=dailyEvent(n),base=income(),cityIncome=n.cities.reduce((a,c)=>a+(c.income||0),0),mult=1+(ev.bonus?.income||0);const daily=Math.round((base*.72+cityIncome*.12)*mult);n.money+=daily;n.awayEarned=(n.awayEarned||0)+daily;n.xp+=80+n.cozy.activityUsed*18;n.population+=Math.max(25,Math.round(n.population*.000012));
  n.cities.forEach(c=>{c.income=(c.income||0)+Math.round((c.level||1)*14000);if((c.cozy?.mood||0)>0)c.happiness=clamp((c.happiness||65)+.25,0,100)});
- n.happiness=clamp(n.happiness+(n.cozy.activityUsed>=7?1:.25),0,100);n.cozy.streak++;n.cozy.dayEnded=true;n.cozy.lastReport={day:n.cozy.dayIndex,earned:daily,activities:n.cozy.activityUsed,event:ev.title,season:internalDate(n).season};
- const city=selectedCity();const names=['Mira','Arif','Nadia','Samir','Lina'];const who=names[n.cozy.dayIndex%names.length];n.cozy.mailbox=[{icon:'💌',title:`${who} noticed your work`,text:`“The neighborhood feels nicer today. Thank you!”`,day:n.cozy.dayIndex},...(n.cozy.mailbox||[])].slice(0,8);
- if(n.cozy.dayIndex%7===0)n.cozy.collection.push(`memory-${n.cozy.dayIndex}`);
- const oldYear=internalDate(n).year;n.cozy.dayIndex++;n.cozy.dayEnded=false;n.cozy.day=dayKey();cozyFor(n);n.history.unshift(`Day ${n.cozy.lastReport.day} ended: ${money(daily)} earned across ${n.cozy.lastReport.activities} activities.`);
+ n.happiness=clamp(n.happiness+(n.cozy.activityUsed>=7?1:.25),0,100);n.cozy.streak++;n.cozy.dayEnded=true;n.cozy.lastReport={day:endingDay,earned:daily,activities:n.cozy.activityUsed,event:ev.title,season:internalDate(n).season};
+ const city=selectedCity();const names=['Mira','Arif','Nadia','Samir','Lina'];const who=names[endingDay%names.length];n.cozy.mailbox=[{icon:'💌',title:`${who} noticed your work`,text:`“The neighborhood feels nicer today. Thank you!”`,day:endingDay},...(n.cozy.mailbox||[])].slice(0,8);
+ if(endingDay%7===0)n.cozy.collection.push(`memory-${endingDay}`);
+ const oldYear=internalDate(n).year;
+ n.cozy.dayIndex=endingDay+1;
+ // A new day always starts with a completely fresh activity budget.
+ // Do not carry yesterday's AP/done list into the new day.
+ startCozyDay(n);
+ n.history.unshift(`Day ${endingDay} ended: ${money(daily)} earned across ${n.cozy.lastReport.activities} activities.`);
  const newYear=internalDate(n).year;if(newYear>oldYear){n.history.unshift(`Year ${oldYear} complete. ${n.name} begins Year ${newYear}.`);n.xp+=500;}
  save();toast(`🌙 Day complete · ${money(daily)} earned`);renderGame();
 }
