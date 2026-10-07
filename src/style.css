@@ -92,3 +92,58 @@
   .metric{min-height:65px}.metric strong{font-size:13px}.metric small{font-size:6.5px}
   .skillrow{grid-template-columns:34px minmax(0,1fr) 70px}.storeitem{grid-template-columns:48px minmax(0,1fr) 52px 44px}.storeitem img{width:48px;height:43px}
 }
+
+/* V7.6 mobile navigation + scroll polish */
+html{scrollbar-width:thin;scrollbar-color:#28556d #04121d}
+*::-webkit-scrollbar{width:7px;height:7px}
+*::-webkit-scrollbar-track{background:#04121d}
+*::-webkit-scrollbar-thumb{background:#28556d;border-radius:99px;border:1px solid #061a28}
+*::-webkit-scrollbar-thumb:hover{background:#39758f}
+.tabs,.sidebar nav{scrollbar-width:thin;scrollbar-color:#2f667f #061724}
+.tabs::-webkit-scrollbar,.sidebar nav::-webkit-scrollbar{height:5px;width:5px}
+.tabs::-webkit-scrollbar-track,.sidebar nav::-webkit-scrollbar-track{background:#061724;border-radius:99px}
+.tabs::-webkit-scrollbar-thumb,.sidebar nav::-webkit-scrollbar-thumb{background:#2f667f;border-radius:99px}
+
+@media(max-width:650px){
+  .sidebar{overflow:hidden}
+  .sidebar nav{width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;white-space:nowrap;touch-action:pan-x;overscroll-behavior-x:contain;overscroll-behavior-y:none;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+  .sidebar nav .navitem{flex:0 0 70px;width:70px;min-width:70px;max-width:70px}
+  .sidebar nav .navitem span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:68px}
+  .tabs{overflow-x:auto;overflow-y:hidden;flex-wrap:nowrap;white-space:nowrap;touch-action:pan-x;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;padding-bottom:7px}
+  .tabs button{flex:0 0 auto}
+}
+
+/* V7.6.1: mobile navigation and store scroll polish */
+.storelist{max-height:430px;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#2f667f #061724;overscroll-behavior:contain}
+.storelist::-webkit-scrollbar{width:6px;height:6px}
+.storelist::-webkit-scrollbar-track{background:#061724;border-radius:99px}
+.storelist::-webkit-scrollbar-thumb{background:#2f667f;border-radius:99px;border:1px solid #061724}
+.storelist::-webkit-scrollbar-thumb:hover{background:#39758f}
+.store-panel{overflow:hidden}
+.fullstore{scrollbar-width:thin;scrollbar-color:#2f667f #061724}
+.fullstore::-webkit-scrollbar{width:7px;height:7px}.fullstore::-webkit-scrollbar-track{background:#061724}.fullstore::-webkit-scrollbar-thumb{background:#2f667f;border-radius:99px}
+
+@media(max-width:650px){
+  .sidebar{touch-action:none}
+  .sidebar nav{display:flex!important;flex-direction:row!important;align-items:stretch;width:100%!important;height:58px!important;overflow-x:scroll!important;overflow-y:hidden!important;flex-wrap:nowrap!important;white-space:nowrap!important;touch-action:pan-x!important;overscroll-behavior:contain!important;-webkit-overflow-scrolling:touch!important;scroll-snap-type:x proximity;scrollbar-width:thin}
+  .sidebar nav::-webkit-scrollbar{width:0;height:5px;display:block}
+  .sidebar nav::-webkit-scrollbar-track{background:#061724;border-radius:99px}
+  .sidebar nav::-webkit-scrollbar-thumb{background:#2f667f;border-radius:99px}
+  .sidebar nav .navitem{flex:0 0 72px!important;width:72px!important;min-width:72px!important;max-width:72px!important;height:58px!important;scroll-snap-align:start;touch-action:pan-x}
+  .sidebar nav .navitem span{display:block!important}
+  .metrics{left:14px!important;right:14px!important;top:292px!important;bottom:auto!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important}
+  .metric{height:70px!important;min-height:70px!important;width:100%!important;padding:10px!important;display:grid!important;grid-template-columns:26px minmax(0,1fr)!important;align-items:center!important;gap:7px!important}
+  .metric .uiicon{width:26px!important;height:26px!important;flex:0 0 26px!important;font-size:18px!important}
+  .metric div{min-width:0!important;display:flex!important;flex-direction:column!important;justify-content:center!important}
+  .metric small{font-size:8px!important;line-height:1.1!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+  .metric strong{font-size:16px!important;line-height:1.1!important;white-space:nowrap!important}
+  .metric em{font-size:8px!important;line-height:1.1!important;white-space:nowrap!important}
+  .storelist{max-height:none;overflow:visible}
+}
+@media(max-width:390px){
+  .sidebar nav .navitem{flex-basis:68px!important;width:68px!important;min-width:68px!important}
+  .metrics{top:286px!important;gap:7px!important}
+  .metric{height:67px!important;min-height:67px!important;padding:8px!important;grid-template-columns:23px minmax(0,1fr)!important}
+  .metric .uiicon{width:23px!important;height:23px!important;flex-basis:23px!important;font-size:16px!important}
+  .metric strong{font-size:14px!important}.metric small,.metric em{font-size:7px!important}
+}
