@@ -519,16 +519,7 @@ function buildNationalScene(host){
     const patch=new THREE.Mesh(new THREE.CircleGeometry(.5,10),mat); patch.scale.set(w,d,1); patch.rotation.x=-Math.PI/2;
     g.add(patch);g.position.set((rng()-.5)*27,.018,(rng()-.5)*19); world.add(g);
   }
-  // Mountains along one edge.
-  for(let i=0;i<10;i++){
-    const h=1.2+rng()*2.4;
-    const m=new THREE.Mesh(new THREE.ConeGeometry(.9+rng()*.8,h,6),new THREE.MeshStandardMaterial({color:0x405057,roughness:1}));
-    m.position.set(-12+i*2.5,h/2-.02,-7.5+rng()*1.8); m.scale.z=1.4; m.castShadow=true; world.add(m);
-  }
-  // River with tributaries.
-  const riverMat=new THREE.MeshStandardMaterial({color:0x397b91,roughness:.22,metalness:.08});
-  const river=new THREE.Mesh(new THREE.PlaneGeometry(2.0,24),riverMat); river.rotation.x=-Math.PI/2; river.position.set(5,0.026,0); river.rotation.z=.13; world.add(river);
-  for(let k=0;k<3;k++){const branch=new THREE.Mesh(new THREE.PlaneGeometry(.45,9),riverMat);branch.rotation.x=-Math.PI/2;branch.rotation.z=(k-1)*.5;branch.position.set(3.6+k*1.0,0.028,-2+k*2.8);world.add(branch)}
+  // Deliberately no mountains or rivers on the national map. The country remains a broad, buildable plain so the city network stays visually dominant.
 
   const roadMat=new THREE.MeshStandardMaterial({color:0x27383c,roughness:.94});
   const railMat=new THREE.MeshStandardMaterial({color:0x9c8769,roughness:.8});
@@ -551,7 +542,6 @@ function buildNationalScene(host){
     const rad=i===0?0:3.0+Math.sqrt(i)*2.05;
     let x=Math.cos(angle)*rad, z=Math.sin(angle)*rad*.70;
     x=Math.max(-12,Math.min(12,x)); z=Math.max(-9,Math.min(9,z));
-    // Keep the capital away from the river centerline.
     if(i===0){x=-1.5;z=-1.5;}
     positions.push([x,z]);
     const cityGroup=new THREE.Group(); cityGroup.position.set(x,.06,z);
