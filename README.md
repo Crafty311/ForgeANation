@@ -29,3 +29,10 @@ https://github.com/jeromeetienne/threex.proceduralcity
 ## Run
 npm install
 npm run dev
+
+V2.1 ACTIVITY UPDATE
+- Replaced three-step click-through opportunities with replayable mini-games.
+- Random activity game each time: Rock Paper Scissors, Tic-Tac-Toe, Heads or Tails, Most Fingers Wins.
+- Mini-games support unlimited rounds until the player chooses Finish Activity.
+- Rewards scale modestly with wins/streak while losses still allow completion.
+- The activity's result is recorded in city history and the daily report.
