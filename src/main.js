@@ -156,8 +156,8 @@ function dailyEvent(n){return dailyEvents[hashCity(`${n.name}:${n.cozy?.dayIndex
 function selectedCity(){const n=state.nation;cozyFor(n);return n.cities[clamp(Number(n.cozy.selectedCity)||0,0,Math.max(0,n.cities.length-1))]||n.cities[0]}
 function chooseCity(i){const n=state.nation;cozyFor(n);n.cozy.selectedCity=clamp(Number(i)||0,0,n.cities.length-1);save();renderGame()}
 function startCozyDay(n){
- n.cozy=n.cozy||{};n.cozy.day=n.cozy.day||dayKey();n.cozy.done=[];n.cozy.dayEnded=false;n.cozy.activeOpportunity=null;n.cozy.opportunityStep=0;
- const seed=hashCity(`${n.name}:${n.cozy.dayIndex}`);const picks=[];for(let i=0;i<5;i++)picks.push(OPPORTUNITIES[(seed+i*3)%OPPORTUNITIES.length].id);n.cozy.tasks=[...new Set(picks)];
+ n.cozy=n.cozy||{};n.cozy.day=n.cozy.day||dayKey();n.cozy.done=[];n.cozy.failed=[];n.cozy.won=[];n.cozy.dayEnded=false;n.cozy.activeOpportunity=null;n.cozy.opportunityStep=0;
+ const seed=hashCity(`${n.name}:${n.cozy.dayIndex}`);const picks=[];for(let i=0;i<5;i++)picks.push(OPPORTUNITIES[(seed+i*3)%OPPORTUNITIES.length].id);n.cozy.tasks=[...new Set(picks)];while(n.cozy.tasks.length<5){const extra=OPPORTUNITIES[(seed+n.cozy.tasks.length*7+11)%OPPORTUNITIES.length].id;if(!n.cozy.tasks.includes(extra))n.cozy.tasks.push(extra);}
  n.cozy.eventId=dailyEvents[seed%dailyEvents.length].id;n.cozy.mailbox=n.cozy.mailbox||[];
 }
 function activeOpportunity(n){cozyFor(n);return OPPORTUNITIES.find(x=>x.id===n.cozy.activeOpportunity)||null}
@@ -172,75 +172,73 @@ function miniGameDef(n){return MINI_GAMES.find(g=>g.id===n?.cozy?.activeGame?.ty
 function freshTtt(){return {board:Array(9).fill(''),turn:'X',winner:null};}
 function beginOpportunity(id){
  const n=state.nation,z=cozyFor(n),op=OPPORTUNITIES.find(x=>x.id===id);
- if(!op||z.done.includes(id))return;
+ if(!op||z.done.includes(id)||z.failed?.includes(id))return;
  if(n.money<op.cost)return toast(`You need ${money(op.cost)} for this.`);
  const game=randomMiniGame();
- z.activeOpportunity=id;
- z.opportunityStep=0;
+ z.activeOpportunity=id;z.opportunityStep=0;
  z.activeGame={type:game.id,rounds:0,wins:0,losses:0,draws:0,score:0,streak:0,lastResult:'',ttt:freshTtt(),coin:null,fingers:null,rps:null};
  save();renderGame();
 }
+function completeWonActivity(op,g){
+ const n=state.nation,z=cozyFor(n);n.money-=op.cost;
+ const ev=dailyEvent(n),bonus=op.cat==='Nature'?(ev.bonus?.improve||0):op.cat==='Economy'?(ev.bonus?.reward||0):op.cat==='Culture'?(ev.bonus?.culture||0):op.cat==='Fun'?(ev.bonus?.fun||0):0;
+ const reward=Math.round(op.reward*(1+bonus));n.money+=reward;n.xp+=op.xp;
+ const mood=Math.round(op.happy);n.happiness=clamp(n.happiness+mood+(ev.bonus?.happy||0),0,100);const c=selectedCity();c.happiness=clamp((c.happiness||65)+mood,0,100);
+ c.cozy=c.cozy||{projects:[],mood:0,decor:[],requests:[]};c.cozy.projects.push({id:op.id,at:z.dayIndex,game:g.type,wins:g.wins,rounds:g.rounds});c.cozy.mood=(c.cozy.mood||0)+mood;
+ if(!z.collection.includes(op.id))z.collection.push(op.id);z.done.push(op.id);z.won.push(op.id);z.activeOpportunity=null;z.activeGame=null;z.opportunityStep=0;
+ n.history.unshift(`${op.title}: won ${g.type} after ${g.rounds} round${g.rounds===1?'':'s'}.`);
+ save();toast(`🏆 ${op.icon} ${op.title} won · ${money(reward)} earned`);renderGame();
+}
+function failActivity(op,g){
+ const n=state.nation,z=cozyFor(n);z.failed=z.failed||[];if(!z.failed.includes(op.id))z.failed.push(op.id);z.activeOpportunity=null;z.activeGame=null;z.opportunityStep=0;
+ n.history.unshift(`${op.title}: failed the ${miniGameDef({cozy:{activeGame:g}}).name}.`);
+ save();toast(`❌ ${op.icon} ${op.title} failed. This activity is unavailable today.`);renderGame();
+}
+function resolveActivityResult(result){
+ const n=state.nation,z=cozyFor(n),op=activeOpportunity(n),g=z.activeGame;if(!op||!g||!result)return;
+ g.rounds++;
+ if(result==='draw'){g.draws++;g.lastResult='draw';save();renderGame();return;}
+ g.lastResult=result;
+ if(result==='win'){g.wins++;g.streak++;completeWonActivity(op,g);}
+ else {g.losses++;g.streak=0;failActivity(op,g);}
+}
 function finishOpportunity(){
- const n=state.nation,z=cozyFor(n),op=activeOpportunity(n),g=z.activeGame;
- if(!op||!g||g.rounds<1)return toast('Play at least one round first.');
- n.money-=op.cost;
- const ev=dailyEvent(n);
- const bonus=op.cat==='Nature'?(ev.bonus?.improve||0):op.cat==='Economy'?(ev.bonus?.reward||0):op.cat==='Culture'?(ev.bonus?.culture||0):op.cat==='Fun'?(ev.bonus?.fun||0):0;
- const performance=1+Math.min(.75,(g.wins-g.losses)*.08)+Math.min(.5,g.streak*.03);
- const reward=Math.round(op.reward*(1+bonus)*Math.max(.25,performance));
- n.money+=reward;n.xp+=Math.round(op.xp*(1+Math.max(0,g.wins-g.losses)*.06));
- const mood=Math.round(op.happy+Math.min(4,g.wins*.35)-Math.min(2,g.losses*.12));
- n.happiness=clamp(n.happiness+mood+(ev.bonus?.happy||0),0,100);
- const c=selectedCity();c.happiness=clamp((c.happiness||65)+mood,0,100);
- c.cozy=c.cozy||{projects:[],mood:0,decor:[],requests:[]};c.cozy.projects.push({id:op.id,at:n.cozy.dayIndex,game:g.type,wins:g.wins,rounds:g.rounds});c.cozy.mood=(c.cozy.mood||0)+mood;
- if(!n.cozy.collection.includes(op.id))n.cozy.collection.push(op.id);n.cozy.done.push(op.id);n.cozy.activeOpportunity=null;n.cozy.activeGame=null;n.cozy.opportunityStep=0;
- n.history.unshift(`${op.title}: ${g.wins} wins in ${g.rounds} rounds of ${miniGameDef({cozy:{activeGame:g}}).name}.`);
- save();toast(`${op.icon} ${op.title} complete · ${g.wins} wins · ${money(reward)} earned`);renderGame();
+ const n=state.nation,z=cozyFor(n);if(z.activeOpportunity)return toast('Win or lose the activity first.');
 }
 function tttWinner(b){
  const lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
- for(const [a,c,d] of lines)if(b[a]&&b[a]===b[c]&&b[a]===b[d])return b[a];
- return b.every(Boolean)?'draw':null;
+ for(const [a,c,d] of lines)if(b[a]&&b[a]===b[c]&&b[a]===b[d])return b[a];return b.every(Boolean)?'draw':null;
 }
 function tttAi(b){
  const empty=b.map((v,i)=>v?null:i).filter(v=>v!==null);if(!empty.length)return;
- // Try a winning move, then block, then center/corner/random.
  for(const mark of ['O','X'])for(const i of empty){const x=b.slice();x[i]=mark;if(tttWinner(x)===mark)return i;}
- if(empty.includes(4))return 4;
- const corners=empty.filter(i=>[0,2,6,8].includes(i));if(corners.length)return corners[Math.floor(Math.random()*corners.length)];
- return empty[Math.floor(Math.random()*empty.length)];
-}
-function resolveTtt(){
- const n=state.nation,z=cozyFor(n),g=z.activeGame,b=g.ttt,w=tttWinner(b.board);if(w)return w;
- const ai=tttAi(b.board);if(ai!==undefined)b.board[ai]='O';return tttWinner(b.board)||null;
+ if(empty.includes(4))return 4;const corners=empty.filter(i=>[0,2,6,8].includes(i));if(corners.length)return corners[Math.floor(Math.random()*corners.length)];return empty[Math.floor(Math.random()*empty.length)];
 }
 function miniGameAction(action,value){
- const n=state.nation,z=cozyFor(n),g=z.activeGame;if(!g)return;
- let result='';
+ const n=state.nation,z=cozyFor(n),g=z.activeGame;if(!g)return;let result='';
  if(g.type==='rps'){
-  const choices=['rock','paper','scissors'];const player=String(value),ai=choices[Math.floor(Math.random()*3)];g.rounds++;g.rps={player,ai};
-  result=player===ai?'draw':((player==='rock'&&ai==='scissors')||(player==='paper'&&ai==='rock')||(player==='scissors'&&ai==='paper'))?'win':'loss';
+  const choices=['rock','paper','scissors'],player=String(value),ai=choices[Math.floor(Math.random()*3)];g.rps={player,ai};result=player===ai?'draw':((player==='rock'&&ai==='scissors')||(player==='paper'&&ai==='rock')||(player==='scissors'&&ai==='paper'))?'win':'loss';
  }else if(g.type==='coin'){
-  const player=String(value),ai=Math.random()<.5?'heads':'tails';g.rounds++;g.coin={player,ai};result=player===ai?'win':'loss';
+  const player=String(value),ai=Math.random()<.5?'heads':'tails';g.coin={player,ai};result=player===ai?'win':'loss';
  }else if(g.type==='fingers'){
-  const player=Math.max(0,Math.min(5,Number(value)||0)),ai=Math.floor(Math.random()*6);g.rounds++;g.fingers={player,ai};result=player===ai?'draw':player>ai?'win':'loss';
+  const player=Math.max(0,Math.min(5,Number(value)||0)),ai=Math.floor(Math.random()*6);g.fingers={player,ai};result=player===ai?'draw':player>ai?'win':'loss';
  }else if(g.type==='ttt'){
-  const i=Number(value);if(!Number.isInteger(i)||i<0||i>8||g.ttt.board[i]||tttWinner(g.ttt.board))return;
-  g.ttt.board[i]='X';let w=tttWinner(g.ttt.board);if(!w){const ai=tttAi(g.ttt.board);if(ai!==undefined)g.ttt.board[ai]='O';w=tttWinner(g.ttt.board)||null;}if(w){g.rounds++;result=w==='X'?'win':w==='O'?'loss':'draw';g.ttt=freshTtt();}
+  const i=Number(value);if(!Number.isInteger(i)||i<0||i>8||g.ttt.board[i])return;
+  g.ttt.board[i]='X';let w=tttWinner(g.ttt.board);if(!w){const ai=tttAi(g.ttt.board);if(ai!==undefined)g.ttt.board[ai]='O';w=tttWinner(g.ttt.board)||null;}if(w){result=w==='X'?'win':w==='O'?'loss':'draw';g.ttt=freshTtt();}
  }
- if(result){g.lastResult=result;g.score+=(result==='win'?1:result==='loss'?-1:0);if(result==='win'){g.wins++;g.streak++;}else if(result==='loss'){g.losses++;g.streak=0;}else{g.draws++;g.streak=0;}}
- save();renderGame();
+ if(result)resolveActivityResult(result);else{save();renderGame();}
 }
 function cancelOpportunity(){const n=state.nation;cozyFor(n);n.cozy.activeOpportunity=null;n.cozy.activeGame=null;n.cozy.opportunityStep=0;save();renderGame()}
 function endDay(){
  const n=state.nation,z=cozyFor(n);if(z.dayEnded)return toast('Today has already ended.');
- const endingDay=z.dayIndex,ev=dailyEvent(n),base=income(),cityIncome=n.cities.reduce((a,c)=>a+(c.income||0),0),mult=1+(ev.bonus?.income||0);const daily=Math.round((base*.72+cityIncome*.12)*mult);n.money+=daily;n.awayEarned=(n.awayEarned||0)+daily;n.xp+=80+z.done.length*28;n.population+=Math.max(25,Math.round(n.population*.000012));
+ const wins=z.won?.length||0,losses=z.failed?.length||0;if(wins<3&&losses<3)return toast(`Win 3 activities to move on, or lose 3 and pay ${money(1000000)} to move on.`);
+ const penalty=losses>=3&&wins<3?1000000:0;if(penalty&&n.money<penalty)return toast(`You need ${money(penalty)} to move to the next day.`);
+ const endingDay=z.dayIndex,ev=dailyEvent(n),base=income(),cityIncome=n.cities.reduce((a,c)=>a+(c.income||0),0),mult=1+(ev.bonus?.income||0);const daily=Math.round((base*.72+cityIncome*.12)*mult);n.money=Math.max(0,n.money+daily-penalty);n.awayEarned=(n.awayEarned||0)+daily;n.xp+=80+wins*28;n.population+=Math.max(25,Math.round(n.population*.000012));
  n.cities.forEach(c=>{const b=c.buildings||[];const incomeBoost=b.reduce((a,x)=>a+(BUILD_DEFS.find(d=>d.id===x.id)?.income||0),0);c.income=(c.income||0)+Math.round((c.level||1)*14000)+incomeBoost*.04;if((c.cozy?.mood||0)>0)c.happiness=clamp((c.happiness||65)+.25,0,100);const homes=b.reduce((a,x)=>a+(BUILD_DEFS.find(d=>d.id===x.id)?.pop||0),0);c.pop=Math.round((c.pop||0)+homes*.006)});
- n.happiness=clamp(n.happiness+(z.done.length>=3?1:.25),0,100);z.streak++;z.dayEnded=true;z.lastReport={day:endingDay,earned:daily,activities:z.done.length,event:ev.title,season:internalDate(n).season};
- const city=selectedCity();const names=['Mira','Arif','Nadia','Samir','Lina'];const who=names[endingDay%names.length];n.cozy.mailbox=[{icon:'💌',title:`${who} noticed your work`,text:`“${city.name} feels a little more alive today.”`,day:endingDay},...(n.cozy.mailbox||[])].slice(0,8);
- if(endingDay%7===0)z.collection.push(`memory-${endingDay}`);const oldYear=internalDate(n).year;z.dayIndex=endingDay+1;z.day=dayKey();startCozyDay(n);const newYear=internalDate(n).year;
- n.history.unshift(`Day ${endingDay} ended: ${money(daily)} earned across ${z.lastReport.activities} local activities.`);if(newYear>oldYear){n.history.unshift(`Year ${oldYear} complete. ${n.name} begins Year ${newYear}.`);n.xp+=500;}
- save();toast(`🌙 Day complete · ${money(daily)} earned`);renderGame();
+ n.happiness=clamp(n.happiness+(wins>=3?1:.25),0,100);z.streak++;z.dayEnded=true;z.lastReport={day:endingDay,earned:daily-penalty,activities:z.done.length,wins,losses,penalty,event:ev.title,season:internalDate(n).season};
+ const city=selectedCity(),names=['Mira','Arif','Nadia','Samir','Lina'],who=names[endingDay%names.length];n.cozy.mailbox=[{icon:'💌',title:`${who} noticed your work`,text:`“${city.name} feels a little more alive today.”`,day:endingDay},...(n.cozy.mailbox||[])].slice(0,8);
+ if(endingDay%7===0)z.collection.push(`memory-${endingDay}`);const oldYear=internalDate(n).year;z.dayIndex=endingDay+1;z.day=dayKey();startCozyDay(n);const newYear=internalDate(n).year;n.history.unshift(`Day ${endingDay} ended: ${money(daily-penalty)} earned across ${wins} wins and ${losses} failed activities.${penalty?' $1M penalty paid.':''}`);if(newYear>oldYear){n.history.unshift(`Year ${oldYear} complete. ${n.name} begins Year ${newYear}.`);n.xp+=500;}
+ save();toast(penalty?`🌙 Day complete · ${money(1000000)} penalty paid`:`🌙 Day complete · ${wins} activities won`);renderGame();
 }
 function visitCity(i){chooseCity(i);state.screen='citybuilder';save();renderGame();}
 
@@ -314,8 +312,9 @@ function miniGameMarkup(g){
 }
 function opportunityCard(){
  const n=state.nation,z=cozyFor(n),c=selectedCity(),ev=dailyEvent(n),tasks=z.tasks.map(id=>OPPORTUNITIES.find(x=>x.id===id)).filter(Boolean),active=activeOpportunity(n);
- if(active){const g=z.activeGame||{type:'rps',rounds:0,wins:0,losses:0,draws:0,streak:0};const def=MINI_GAMES.find(x=>x.id===g.type)||MINI_GAMES[0];return `<section class="panel opportunity-panel activeop"><div class="paneltitle"><div><h2>${active.icon} ${active.title}</h2><small>${def.icon} ${def.name} · ${ev.icon} ${ev.title}</small></div><button class="outline" data-action="cancel-opportunity">Leave</button></div><div class="gamewrap"><div class="gamestats"><span>Rounds <b>${g.rounds}</b></span><span>Wins <b>${g.wins}</b></span><span>Losses <b>${g.losses}</b></span><span>Streak <b>${g.streak}</b></span></div>${miniGameMarkup(g)}<div class="game-actions"><span>Play unlimited rounds — stop whenever you want.</span><button class="gold" data-action="finish-opportunity" ${g.rounds<1?'disabled':''}>Finish Activity · ${g.wins} wins</button></div></div></section>`;}
- return `<section class="panel opportunity-panel"><div class="paneltitle"><div><h2>Today in ${esc(c.name)}</h2><small>${ev.icon} ${ev.title} · ${ev.desc}</small></div><div class="dayactions"><button class="gold endday" data-action="end-day">End Day →</button></div></div><div class="opportunitylist">${tasks.map(x=>{const done=z.done.includes(x.id);const game=MINI_GAMES[hashCity(`${n.name}:${n.cozy.dayIndex}:${x.id}`)%MINI_GAMES.length];return `<article class="opportunity ${done?'done':''}"><div class="momenticon">${x.icon}</div><div><b>${x.title}</b><small>Play ${game.icon} ${game.name} · unlimited rounds</small><em>${money(x.cost)} · ${x.reward?`Base reward ${money(x.reward)} · `:''}+${x.happy}% happiness</em></div><button class="mini ${done?'lockbtn':'greenbtn'}" data-opportunity="${x.id}" ${done?'disabled':''}>${done?'Done':'Play'}</button></article>`}).join('')}</div><div class="dayfooter"><span><b>${z.done.length}</b> local activities completed.</span><span>End the day whenever you like.</span></div></section>`;
+ if(active){const g=z.activeGame||{type:'rps',rounds:0,wins:0,losses:0,draws:0,streak:0};const def=MINI_GAMES.find(x=>x.id===g.type)||MINI_GAMES[0];return `<section class="panel opportunity-panel activeop"><div class="paneltitle"><div><h2>${active.icon} ${active.title}</h2><small>${def.icon} ${def.name} · Draw = replay</small></div><button class="outline" data-action="cancel-opportunity">Leave</button></div><div class="gamewrap"><div class="gamestats"><span>Wins <b>${g.wins}</b>/1</span><span>Losses <b>${g.losses}</b>/1</span><span>Draws <b>${g.draws}</b></span><span>Result <b>${g.lastResult||'—'}</b></span></div>${miniGameMarkup(g)}<div class="game-actions"><span>${g.lastResult==='draw'?'Draw! Play this same activity again.':'One win completes it. One loss fails it.'}</span></div></div></section>`;}
+ const wins=z.won?.length||0,losses=z.failed?.length||0,canEnd=wins>=3||losses>=3,need=wins>=3?'3 wins reached':losses>=3?'3 failures — $1M move-on fee':`${wins}/3 wins · ${losses}/3 failures`;
+ return `<section class="panel opportunity-panel"><div class="paneltitle"><div><h2>Today in ${esc(c.name)}</h2><small>${ev.icon} ${ev.title} · ${ev.desc}</small></div><div class="dayactions"><span class="apbadge">${need}</span>${canEnd?`<button class="gold endday" data-action="end-day">${losses>=3&&wins<3?'Pay $1M & Move On':'Move to Next Day →'}</button>`:''}</div></div><div class="daily-event"><b>🎮 Five activities are available</b><span>Win an activity to count toward your 3 wins. Lose one and it closes for today. Draws let you replay.</span></div><div class="opportunitylist">${tasks.map(x=>{const done=z.done.includes(x.id),failed=z.failed?.includes(x.id),game=MINI_GAMES[hashCity(`${n.name}:${n.cozy.dayIndex}:${x.id}`)%MINI_GAMES.length];return `<article class="opportunity ${done?'done':''} ${failed?'failed':''}"><div class="momenticon">${failed?'❌':done?'🏆':x.icon}</div><div><b>${x.title}</b><small>🎮 ${game.name}</small><em>${done?'Won':failed?'Failed · unavailable today':'Play until you win or lose'}</em></div><button class="mini ${done||failed?'lockbtn':'greenbtn'}" data-opportunity="${x.id}" ${done||failed?'disabled':''}>${done?'Won':failed?'Failed':'Play'}</button></article>`}).join('')}</div><div class="dayfooter"><span><b>${wins}</b> wins · <b>${losses}</b> failed</span><span>${canEnd?'You may move on.':'Reach 3 wins or 3 failed activities.'}</span></div></section>`;
 }
 function home(){return `<main class="maincontent">${hero()}${opportunityCard()}<div class="cozyextras">${mailboxCard()}${reportCard()}${collectionCard()}</div><div class="dashboardgrid"><div>${skillsCard()}</div><div>${storeCard()}</div><div>${cityCard()}</div><div>${progressCard()}</div><div>${globalCard()}${achievements()}</div></div><div class="lowergrid">${lower()}</div></main>`;}
 function listPage(kicker,title,content){return `<main class="subpage"><div class="pagehead"><small>${kicker.toUpperCase()}</small><h1>${title}</h1><p>Manage this part of ${esc(state.nation.name)} with the same progression-driven simulation.</p></div>${content}</main>`;}
