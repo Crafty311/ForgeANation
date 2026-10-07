@@ -131,51 +131,126 @@ function initHeroScene(){
   disposeHeroScene();
   const width=host.clientWidth||900,height=host.clientHeight||390;
   const scene=new THREE.Scene();
-  scene.fog=new THREE.FogExp2(0x07131d,.032);
-  const camera=new THREE.PerspectiveCamera(31,width/height,.1,120);camera.position.set(11,7.2,13);camera.lookAt(0,1.8,0);
-  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});renderer.setPixelRatio(Math.min(1.5,devicePixelRatio||1));renderer.setSize(width,height,false);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;host.appendChild(renderer.domElement);
-  scene.background=new THREE.Color(0x07131d);
-  scene.add(new THREE.HemisphereLight(0x9ec9df,0x081019,1.35));
-  const sun=new THREE.DirectionalLight(0xffd6a0,2.5);sun.position.set(-8,12,7);sun.castShadow=true;scene.add(sun);
-  const moon=new THREE.Mesh(new THREE.SphereGeometry(1.05,24,24),new THREE.MeshBasicMaterial({color:0xffe4b5,transparent:true,opacity:.78}));moon.position.set(-7,7,-8);scene.add(moon);
-  const moonGlow=new THREE.PointLight(0xffc77a,1.8,18);moonGlow.position.copy(moon.position);scene.add(moonGlow);
-  const world=new THREE.Group();scene.add(world);
-  const water=new THREE.Mesh(new THREE.PlaneGeometry(38,18,1,1),new THREE.MeshStandardMaterial({color:0x0b4052,roughness:.22,metalness:.3,transparent:true,opacity:.92}));water.rotation.x=-Math.PI/2;water.position.set(0,-.08,4.8);world.add(water);
-  const terrainMat=new THREE.MeshStandardMaterial({color:0x183b3d,roughness:.96,flatShading:true});
+  scene.background=new THREE.Color(0x050b12);
+  scene.fog=new THREE.FogExp2(0x07111b,.035);
+  const camera=new THREE.PerspectiveCamera(34,width/height,.1,140);
+  camera.position.set(8.8,5.2,10.8); camera.lookAt(0,1.1,0);
+  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
+  renderer.setPixelRatio(Math.min(1.5,window.devicePixelRatio||1));
+  renderer.setSize(width,height,false);
+  renderer.outputColorSpace=THREE.SRGBColorSpace;
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  host.appendChild(renderer.domElement);
+
+  // Landscape — Night direction: moonlit procedural terrain, dense star band,
+  // atmospheric fog, grass/stone foreground and a slow cinematic camera.
+  scene.add(new THREE.HemisphereLight(0x587b9a,0x03070b,.9));
+  const moonLight=new THREE.DirectionalLight(0xb9d4ee,1.7);
+  moonLight.position.set(-7,12,5); moonLight.castShadow=true; scene.add(moonLight);
+  const warmFill=new THREE.PointLight(0xffb25d,2.0,28); warmFill.position.set(2,2,-1); scene.add(warmFill);
+
+  const world=new THREE.Group(); scene.add(world);
+  const groundMat=new THREE.MeshStandardMaterial({color:0x17272b,roughness:.96,metalness:0,flatShading:true});
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(34,25,42,28),groundMat);
+  ground.rotation.x=-Math.PI/2; ground.position.set(0,-.08,-1); ground.receiveShadow=true; world.add(ground);
+  const gp=ground.geometry.attributes.position;
+  for(let i=0;i<gp.count;i++){
+    const x=gp.getX(i),z=gp.getY(i);
+    const y=.06*Math.sin(x*.75)+.045*Math.cos(z*.9)+.025*Math.sin((x+z)*2.1);
+    gp.setZ(i,y);
+  }
+  ground.geometry.computeVertexNormals();
+
+  // Distant ridges, kept low so the hero reads as a landscape rather than a city render.
   for(let band=0;band<5;band++){
-    const geo=new THREE.PlaneGeometry(26-band*2.2,6.5-band*.55,18,6);
+    const w=30-band*2.2,h=6.2-band*.42;
+    const geo=new THREE.PlaneGeometry(w,h,26,8);
     const pos=geo.attributes.position;
-    for(let i=0;i<pos.count;i++){const x=pos.getX(i),y=pos.getY(i);const crest=Math.sin(x*.34+band*1.7)*(.75+band*.13)+Math.sin(x*.72-band)*.25;pos.setZ(i,crest*(1-Math.abs(y)/3.3)*(.7+band*.1));}
-    geo.computeVertexNormals();const m=terrainMat.clone();m.color.setHSL(.50-.02*band,.28,.16+.025*band);
-    const ridge=new THREE.Mesh(geo,m);ridge.rotation.x=-Math.PI/2;ridge.position.set(0,.25+band*.28,-4.2-band*1.45);ridge.scale.y=1.15;world.add(ridge);
+    for(let i=0;i<pos.count;i++){
+      const x=pos.getX(i),y=pos.getY(i), edge=1-Math.min(1,Math.abs(y)/(h*.5));
+      const crest=Math.sin(x*.28+band*1.37)*(.8+band*.08)+Math.sin(x*.63-band*.7)*.27+Math.cos(x*1.05+band)*.12;
+      pos.setZ(i,crest*edge);
+    }
+    geo.computeVertexNormals();
+    const mat=new THREE.MeshStandardMaterial({color:new THREE.Color().setHSL(.55,.25,.095+band*.018),roughness:1,flatShading:true});
+    const ridge=new THREE.Mesh(geo,mat);
+    ridge.rotation.x=-Math.PI/2;
+    ridge.position.set(0,.35+band*.27,-5.0-band*1.45);
+    world.add(ridge);
   }
-  const city=new THREE.Group();city.position.set(0,.03,.1);world.add(city);
-  const rng=(()=>{let x=hashCity(`${state.nation?.name||'nation'}:hero`);return()=>{x=(Math.imul(1664525,x)+1013904223)>>>0;return x/4294967296}})();
+
+  // Moon and restrained halo.
+  const moon=new THREE.Mesh(new THREE.SphereGeometry(.78,24,24),new THREE.MeshBasicMaterial({color:0xe4edf4}));
+  moon.position.set(-6.8,6.4,-9); world.add(moon);
+  const halo=new THREE.Mesh(new THREE.SphereGeometry(1.35,20,20),new THREE.MeshBasicMaterial({color:0x8fb7d6,transparent:true,opacity:.075,depthWrite:false}));
+  halo.position.copy(moon.position); world.add(halo);
+
+  // Star band: dense, but constrained to the visible upper landscape rather than a noisy full cube.
+  const starGeo=new THREE.BufferGeometry(),stars=[];
+  const rng=(()=>{let x=hashCity(`${state.nation?.name||'nation'}:landscape-night`);return()=>{x=(Math.imul(1664525,x)+1013904223)>>>0;return x/4294967296}})();
+  for(let i=0;i<3920;i++){
+    const x=(rng()-.5)*34, y=3.0+rng()*8.8, z=-13+rng()*10;
+    stars.push(x,y,z);
+  }
+  starGeo.setAttribute('position',new THREE.Float32BufferAttribute(stars,3));
+  world.add(new THREE.Points(starGeo,new THREE.PointsMaterial({color:0xd7e8f4,size:.018,transparent:true,opacity:.72,depthWrite:false,blending:THREE.AdditiveBlending})));
+
+  // Foreground stones and grass-like tufts give the terrain the authored 3D feel.
+  const terrainSeed=rng;
+  for(let i=0;i<55;i++){
+    const x=(terrainSeed()-.5)*17,z=1+terrainSeed()*8;
+    const s=.035+terrainSeed()*.095;
+    const stone=new THREE.Mesh(new THREE.DodecahedronGeometry(s,0),new THREE.MeshStandardMaterial({color:0x3a4a4d,roughness:1}));
+    stone.position.set(x,s,z); stone.scale.y=.55+terrainSeed()*.7; world.add(stone);
+  }
+  for(let i=0;i<90;i++){
+    const x=(terrainSeed()-.5)*18,z=1+terrainSeed()*7;
+    const g=new THREE.Group();
+    for(let j=0;j<3;j++){
+      const blade=new THREE.Mesh(new THREE.ConeGeometry(.012,.22+terrainSeed()*.18,3),new THREE.MeshStandardMaterial({color:0x345b4c,roughness:1}));
+      blade.position.set((terrainSeed()-.5)*.08,.11,(terrainSeed()-.5)*.08); blade.rotation.z=(terrainSeed()-.5)*.45; g.add(blade);
+    }
+    g.position.set(x,0,z); world.add(g);
+  }
+
+  // A subtle distant road/settlement trace connects the landscape to the nation-building theme.
+  const routeMat=new THREE.LineBasicMaterial({color:0x6ea7aa,transparent:true,opacity:.24});
+  for(let r=0;r<4;r++){
+    const pts=[];
+    for(let i=0;i<28;i++){
+      const x=-8+i*.6, z=-1.4+r*.65+Math.sin(i*.34+r)*.1;
+      pts.push(new THREE.Vector3(x,.025,z));
+    }
+    world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),routeMat));
+  }
+
+  // A small distant settlement grows with national level, so the hero remains connected to progression.
+  const city=new THREE.Group(); city.position.set(1.3,.02,-2.5); world.add(city);
   const lvl=Math.max(1,Math.min(8,level().level));
-  const roadMat=new THREE.MeshStandardMaterial({color:0x273c42,roughness:.85});
-  for(let i=0;i<7;i++){const x=-5.2+i*1.75;const road=new THREE.Mesh(new THREE.BoxGeometry(.13,.035,6.8),roadMat);road.position.set(x,.03,0);city.add(road);}
-  for(let i=0;i<5;i++){const z=-2.5+i*1.35;const road=new THREE.Mesh(new THREE.BoxGeometry(10.5,.035,.12),roadMat);road.position.set(0,.035,z);city.add(road);}
-  const buildingMat=[0x8da8b2,0x557a87,0xb0a58d,0x6d8d93,0x9a8b73];
-  const count=28+lvl*8;
-  for(let i=0;i<count;i++){
-    const x=(rng()-.5)*9.5,z=(rng()-.5)*5.3;
-    const h=(.35+rng()*1.25)*(1+lvl*.13)*(rng()<.1+lvl*.012?1.8:1);
-    const w=.28+rng()*.5,d=.28+rng()*.5;
-    const mat=new THREE.MeshStandardMaterial({color:buildingMat[Math.floor(rng()*buildingMat.length)],roughness:.7,metalness:.08});
-    const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);b.position.set(x,h/2+.07,z);b.castShadow=true;city.add(b);
-    if(rng()<.38){const glow=new THREE.Mesh(new THREE.PlaneGeometry(w*.72,h*.45),new THREE.MeshBasicMaterial({color:0x9ee7df,transparent:true,opacity:.22,side:THREE.DoubleSide}));glow.position.set(x-w/2-.006,h*.57,z);glow.rotation.y=Math.PI/2;city.add(glow);}
+  const cityCount=7+lvl*5;
+  for(let i=0;i<cityCount;i++){
+    const x=(rng()-.5)*6.2,z=(rng()-.5)*1.8;
+    const h=.15+rng()*.22+lvl*.025;
+    const b=new THREE.Mesh(new THREE.BoxGeometry(.16+rng()*.18,h,.16+rng()*.16),new THREE.MeshStandardMaterial({color:0x506b72,roughness:.8}));
+    b.position.set(x,h/2,z); city.add(b);
+    if(rng()<.45){
+      const light=new THREE.Mesh(new THREE.PlaneGeometry(.05,h*.3),new THREE.MeshBasicMaterial({color:0xffc76d,transparent:true,opacity:.65,side:THREE.DoubleSide}));
+      light.position.set(x-.085,h*.55,z); light.rotation.y=Math.PI/2; city.add(light);
+    }
   }
-  // signature skyline landmark
-  const tower=new THREE.Mesh(new THREE.BoxGeometry(.58,3.3+lvl*.2,.58),new THREE.MeshStandardMaterial({color:0x9ec2cc,metalness:.3,roughness:.35}));tower.position.set(2.4,1.65+lvl*.1,-.7);tower.castShadow=true;city.add(tower);
-  const spire=new THREE.Mesh(new THREE.ConeGeometry(.12,.9,6),new THREE.MeshStandardMaterial({color:0xd8b15c,metalness:.5,roughness:.3}));spire.position.set(2.4,3.7+lvl*.2,-.7);city.add(spire);
-  // luminous development routes
-  const routeMat=new THREE.LineBasicMaterial({color:0x56d8d4,transparent:true,opacity:.48});
-  for(let r=0;r<5;r++){const pts=[];for(let i=0;i<30;i++){const x=-6+i*.42;const z=-1.9+r*.8+Math.sin(i*.38+r)*.12;pts.push(new THREE.Vector3(x,.08,z));}city.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),routeMat));}
-  // atmospheric particles
-  const pg=new THREE.BufferGeometry(),pp=[];for(let i=0;i<260;i++){pp.push((rng()-.5)*20,1+rng()*7,(rng()-.5)*16-2)}pg.setAttribute('position',new THREE.Float32BufferAttribute(pp,3));scene.add(new THREE.Points(pg,new THREE.PointsMaterial({color:0x91d8d6,size:.025,transparent:true,opacity:.5,depthWrite:false,blending:THREE.AdditiveBlending})));
-  const rec={renderer,scene,camera,world,host};heroSceneRecord=rec;
+
+  const rec={renderer,scene,camera,world,host}; heroSceneRecord=rec;
   let t=0;
-  const animate=()=>{heroSceneFrame=requestAnimationFrame(animate);t+=.003;world.position.y=Math.sin(t*.55)*.025;world.rotation.y=Math.sin(t*.22)*.012;camera.position.x=11+Math.sin(t*.4)*.45;camera.lookAt(0,1.6,0);renderer.render(scene,camera)};
+  const animate=()=>{
+    heroSceneFrame=requestAnimationFrame(animate); t+=.0025;
+    world.position.y=Math.sin(t*.55)*.018;
+    world.rotation.y=Math.sin(t*.13)*.006;
+    camera.position.x=8.8+Math.sin(t*.32)*.28;
+    camera.position.y=5.2+Math.sin(t*.24)*.08;
+    camera.lookAt(0,1.05,0);
+    renderer.render(scene,camera);
+  };
   animate();
   heroSceneResize=()=>{if(!heroSceneRecord)return;const w=host.clientWidth||900,h=host.clientHeight||390;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false)};
   window.addEventListener('resize',heroSceneResize);
