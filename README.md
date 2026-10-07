@@ -36,3 +36,7 @@ V2.1 ACTIVITY UPDATE
 - Mini-games support unlimited rounds until the player chooses Finish Activity.
 - Rewards scale modestly with wins/streak while losses still allow completion.
 - The activity's result is recorded in city history and the daily report.
+
+
+## Mini-game references
+V2.3 uses original Forge a Nation implementations informed by open-source interaction patterns from MIT-licensed browser-game projects: Ajay Dhangar rock-paper-scissors, Kaustubh Deshmane tic-tac-toe, and Bektas Sari flip-coin. These projects were reviewed as references; no external runtime dependency is required.
