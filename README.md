@@ -40,3 +40,8 @@ V2.1 ACTIVITY UPDATE
 
 ## Mini-game references
 V2.3 uses original Forge a Nation implementations informed by open-source interaction patterns from MIT-licensed browser-game projects: Ajay Dhangar rock-paper-scissors, Kaustubh Deshmane tic-tac-toe, and Bektas Sari flip-coin. These projects were reviewed as references; no external runtime dependency is required.
+
+## V2.4 audio
+- Ambient BGM: `relax_background1` by joaquinton, CC0, from OpenGameArt.org. The game streams the loop from the original public asset URL.
+- Tactile UI/game feedback is generated locally with Web Audio so every click and result has immediate feedback without adding a large SFX dependency.
+- Audio is muted/unmuted from the speaker button beside the hamburger button; the preference is saved locally.
