@@ -140,7 +140,7 @@ const dailyEvents=[
 ];
 const seasons=['Spring','Summer','Autumn','Winter'];
 function internalDate(n){const day=Math.max(1,n?.cozy?.dayIndex||1),year=Math.floor((day-1)/30)+1,dayOfYear=((day-1)%30)+1,season=seasons[Math.floor(((dayOfYear-1)%30)/8)]||'Winter';return {day,year,dayOfYear,season};}
-function dayKey(){return `day-${Math.max(1,state?.nation?.cozy?.dayIndex||1)}`}
+function dayKey(n=state?.nation){return `day-${Math.max(1,n?.cozy?.dayIndex||1)}`}
 function cozyFor(n){
  n.cozy=n.cozy||{};
  n.cozy.dayIndex=Math.max(1,n.cozy.dayIndex||1);
@@ -150,14 +150,14 @@ function cozyFor(n){
  n.cozy.selectedCity=clamp(Number(n.cozy.selectedCity)||0,0,Math.max(0,(n.cities?.length||1)-1));
  n.cozy.activeOpportunity=n.cozy.activeOpportunity||null;
  n.cozy.opportunityStep=Number(n.cozy.opportunityStep)||0;
- if(n.cozy.day!==dayKey()) startCozyDay(n);
+ if(n.cozy.day!==dayKey(n)) startCozyDay(n);
  return n.cozy;
 }
 function dailyEvent(n){return dailyEvents[hashCity(`${n.name}:${n.cozy?.dayIndex||1}`)%dailyEvents.length]||dailyEvents[0]}
 function selectedCity(){const n=state.nation;cozyFor(n);return n.cities[clamp(Number(n.cozy.selectedCity)||0,0,Math.max(0,n.cities.length-1))]||n.cities[0]}
 function chooseCity(i){const n=state.nation;cozyFor(n);n.cozy.selectedCity=clamp(Number(i)||0,0,n.cities.length-1);save();renderGame()}
 function startCozyDay(n){
- n.cozy=n.cozy||{};n.cozy.day=n.cozy.day||dayKey();n.cozy.done=[];n.cozy.failed=[];n.cozy.won=[];n.cozy.dayEnded=false;n.cozy.activeOpportunity=null;n.cozy.opportunityStep=0;
+ n.cozy=n.cozy||{};n.cozy.day=n.cozy.day||dayKey(n);n.cozy.done=[];n.cozy.failed=[];n.cozy.won=[];n.cozy.dayEnded=false;n.cozy.activeOpportunity=null;n.cozy.opportunityStep=0;
  const seed=hashCity(`${n.name}:${n.cozy.dayIndex}`);const picks=[];for(let i=0;i<5;i++)picks.push(OPPORTUNITIES[(seed+i*3)%OPPORTUNITIES.length].id);n.cozy.tasks=[...new Set(picks)];while(n.cozy.tasks.length<5){const extra=OPPORTUNITIES[(seed+n.cozy.tasks.length*7+11)%OPPORTUNITIES.length].id;if(!n.cozy.tasks.includes(extra))n.cozy.tasks.push(extra);}
  n.cozy.eventId=dailyEvents[seed%dailyEvents.length].id;n.cozy.mailbox=n.cozy.mailbox||[];
 }
@@ -256,7 +256,7 @@ function endDay(){
  n.cities.forEach(c=>{const b=c.buildings||[];const incomeBoost=b.reduce((a,x)=>a+(BUILD_DEFS.find(d=>d.id===x.id)?.income||0),0);c.income=(c.income||0)+Math.round((c.level||1)*14000)+incomeBoost*.04;if((c.cozy?.mood||0)>0)c.happiness=clamp((c.happiness||65)+.25,0,100);const homes=b.reduce((a,x)=>a+(BUILD_DEFS.find(d=>d.id===x.id)?.pop||0),0);c.pop=Math.round((c.pop||0)+homes*.006)});
  n.happiness=clamp(n.happiness+(wins>=3?1:.25),0,100);z.streak++;z.dayEnded=true;z.lastReport={day:endingDay,earned:daily-penalty,activities:z.done.length,wins,losses,penalty,event:ev.title,season:internalDate(n).season};
  const city=selectedCity(),names=['Mira','Arif','Nadia','Samir','Lina'],who=names[endingDay%names.length];n.cozy.mailbox=[{icon:'💌',title:`${who} noticed your work`,text:`“${city.name} feels a little more alive today.”`,day:endingDay},...(n.cozy.mailbox||[])].slice(0,8);
- if(endingDay%7===0)z.collection.push(`memory-${endingDay}`);const oldYear=internalDate(n).year;z.dayIndex=endingDay+1;z.day=dayKey();startCozyDay(n);const newYear=internalDate(n).year;n.history.unshift(`Day ${endingDay} ended: ${money(daily-penalty)} earned across ${wins} wins and ${losses} failed activities.${penalty?' $1M penalty paid.':''}`);if(newYear>oldYear){n.history.unshift(`Year ${oldYear} complete. ${n.name} begins Year ${newYear}.`);n.xp+=500;}
+ if(endingDay%7===0)z.collection.push(`memory-${endingDay}`);const oldYear=internalDate(n).year;z.dayIndex=endingDay+1;z.day=dayKey(n);startCozyDay(n);const newYear=internalDate(n).year;n.history.unshift(`Day ${endingDay} ended: ${money(daily-penalty)} earned across ${wins} wins and ${losses} failed activities.${penalty?' $1M penalty paid.':''}`);if(newYear>oldYear){n.history.unshift(`Year ${oldYear} complete. ${n.name} begins Year ${newYear}.`);n.xp+=500;}
  save();toast(penalty?`🌙 Day complete · ${money(1000000)} penalty paid`:`🌙 Day complete · ${wins} activities won`);renderGame();
 }
 function visitCity(i){chooseCity(i);state.screen='citybuilder';save();renderGame();}
@@ -331,7 +331,7 @@ function createNation(){
  state.nation.history.unshift(`Starting package: ${terrain} geography + ${gov} institutions + ${fd.name} focus.`);
  state.screen='home';state.lastSeen=Date.now();save();showGame();sfx('success');toast(`Nation forged. ${terrain} + ${fd.name} starting package applied.`);
 }
-function newNation(){if(confirm('Start a new nation? Your current nation will be replaced.')){localStorage.removeItem(KEY);state={...defaultState,screen:'landing'};showLanding();}}
+function newNation(){if(confirm('Start a new nation? Your current nation will be replaced.')){try{[...new Set([...SAVE_KEYS,...OLD_KEYS])].forEach(k=>localStorage.removeItem(k));}catch{}try{window.name='';}catch{}state={...defaultState,screen:'landing'};showLanding();}}
 function upgradeSkill(id){const n=state.nation,c=skillCost(id),d=skillDefs.find(x=>x.id===id);if(!Number.isFinite(c)||c<0)return toast('This upgrade cost could not be calculated.');if(n.money<c)return toast('You need more national wealth.');n.money=Math.max(0,Math.round(n.money-c));n.skills[id]++;n.xp+=Math.round(c/28000)+70;n.history.unshift(`${d.name} advanced to Level ${n.skills[id]}.`);save();toast(`${d.name} upgraded`);renderGame();}
 function buyAsset(id){const n=state.nation,d=storeDefs.find(x=>x.id===id);if(!d)return;if(level().level<d.req)return toast(`Reach Level ${d.req} to unlock this.`);if(!Number.isFinite(d.cost)||d.cost<0)return toast('This purchase cost could not be calculated.');if(n.money<d.cost)return toast('Not enough national wealth.');n.money=Math.max(0,Math.round(n.money-d.cost));n.assets[id]=(n.assets[id]||0)+1;n.xp+=Math.round(d.cost/20000);if(id==='stadium')n.happiness=Math.min(100,n.happiness+3);if(id==='hospital')n.happiness=Math.min(100,n.happiness+4);if(id==='finance')n.reputation+=4;n.history.unshift(`${d.name} was built in ${n.name}.`);save();toast(`${d.name} built`);renderGame();}
 function upgradeCity(){const n=state.nation,c=selectedCity(),cost=Math.round(1800000*Math.pow(1.48,Math.max(0,(c.level||1)-1)));if(!Number.isFinite(cost)||cost<0)return toast('This city upgrade cost could not be calculated.');if(n.money<cost)return toast('Not enough wealth to upgrade this city.');n.money=Math.max(0,Math.round(n.money-cost));c.level=(c.level||1)+1;c.pop=Math.round(c.pop*1.10);c.income=(c.income||0)+420000;c.happiness=Math.min(100,(c.happiness||65)+1);n.cityLevel=Math.max(n.cityLevel||1,c.level);n.happiness=Math.min(100,n.happiness+1);n.xp+=Math.round(cost/18000);n.history.unshift(`${c.name} reached City Level ${c.level}.`);ensureCityVariants(n);save();toast(`${c.name} grew into a larger city`);renderGame();}
