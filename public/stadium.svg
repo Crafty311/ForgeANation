@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 360" preserveAspectRatio="xMidYMid slice">
+<defs>
+ <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#162d4a"/><stop offset=".48" stop-color="#e59a62"/><stop offset="1" stop-color="#263d4c"/></linearGradient>
+ <linearGradient id="water" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#275f78"/><stop offset="1" stop-color="#071c2c"/></linearGradient>
+ <linearGradient id="hill" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#1a3340"/><stop offset="1" stop-color="#385747"/></linearGradient>
+ <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#74b7d2"/><stop offset="1" stop-color="#163b57"/></linearGradient>
+</defs><rect width="720" height="360" fill="#0a1822"/><circle cx="585" cy="70" r="55" fill="#7bbd83" opacity=".16"/><path d="M0 300h720v60H0z" fill="#122a32"/><g fill="#30483e"><ellipse cx="360" cy="230" rx="250" ry="120" fill="#223b4b" stroke="#a6c47e" stroke-width="26"/><ellipse cx="360" cy="230" rx="160" ry="72" fill="#4d9a64"/><path d="M215 230h290M360 160v140" stroke="#d7e2b2" stroke-width="5"/></g><path d="M0 325h720" stroke="#7bbd83" stroke-width="6" opacity=".8"/></svg>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 360" preserveAspectRatio="xMidYMid slice">
+<defs>
+ <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#162d4a"/><stop offset=".48" stop-color="#e59a62"/><stop offset="1" stop-color="#263d4c"/></linearGradient>
+ <linearGradient id="water" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#275f78"/><stop offset="1" stop-color="#071c2c"/></linearGradient>
+ <linearGradient id="hill" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#1a3340"/><stop offset="1" stop-color="#385747"/></linearGradient>
+ <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#74b7d2"/><stop offset="1" stop-color="#163b57"/></linearGradient>
+</defs><rect width="720" height="360" fill="#0a1822"/><circle cx="585" cy="70" r="55" fill="#d85c68" opacity=".16"/><path d="M0 300h720v60H0z" fill="#122a32"/><g fill="#2d4450"><rect x="120" y="120" width="500" height="210" rx="18"/><rect x="315" y="85" width="110" height="280"/><path d="M370 130v180M280 220h180" stroke="#f5e8e8" stroke-width="34"/></g><path d="M0 325h720" stroke="#d85c68" stroke-width="6" opacity=".8"/></svg>
