@@ -126,7 +126,7 @@ function disposeHeroScene(){
   if(heroSceneResize){window.removeEventListener('resize',heroSceneResize);heroSceneResize=null;}
   if(heroSceneRecord){try{heroSceneRecord.scene.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose())}});heroSceneRecord.renderer.dispose();heroSceneRecord.host.innerHTML='';}catch{} heroSceneRecord=null;}
 }
-function buildHeroScene(){
+function initHeroScene(){
   const host=$('#hero-scene'); if(!host)return;
   disposeHeroScene();
   const width=host.clientWidth||900,height=host.clientHeight||390;
