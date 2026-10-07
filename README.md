@@ -32,3 +32,10 @@ The existing V8.0 and earlier save keys remain available for migration. V8.1 add
 
 ## Build
 The archive intentionally does not include node_modules. Install dependencies with `npm install`, then run `npm run build`.
+
+
+## V8.1.3 Interface Update
+- Moved Continue Nation and New Nation actions into the persistent top bar.
+- Shifted the hamburger/navigation control to the left edge of the top bar.
+- Removed the redundant Quick Actions panel from the sidebar.
+- Added responsive top-bar compression for desktop, laptop, tablet, and mobile widths.
