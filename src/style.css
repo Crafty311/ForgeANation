@@ -777,3 +777,21 @@ html{scrollbar-width:thin;scrollbar-color:#28556d #04121d}
 .sidebar.collapsed .brand{display:flex!important;justify-content:center!important;align-items:center!important}
 .sidebar.collapsed .brand h1{font-size:22px!important;text-align:center!important}
 .sidebar.collapsed .brand h1:after{display:none!important}
+
+/* V2.13.2 — restore original typography; center the wordmark without overlapping controls. */
+.brand{display:flex!important;align-items:center;justify-content:center;padding:4px 10px 28px!important;border-bottom:1px solid rgba(132,166,182,.16)!important}
+.brand h1{font-family:Georgia,serif!important;font-size:28px!important;line-height:1!important;letter-spacing:-.04em!important;text-align:center!important;margin:0!important;color:#e9e2cc!important;font-weight:400!important;white-space:nowrap}
+.brand p{display:none!important}
+.topbar{display:grid!important;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important;align-items:center!important;justify-content:initial!important;gap:18px!important;position:sticky!important}
+.topleft{min-width:0!important;grid-column:1!important;display:flex!important;align-items:center!important;gap:10px!important}
+.topbrand{position:static!important;grid-column:2!important;transform:none!important;font-family:Georgia,serif!important;font-size:25px!important;line-height:1!important;letter-spacing:-.035em!important;color:#e9e2cc!important;font-weight:400!important;white-space:nowrap!important;pointer-events:none!important;text-align:center!important}
+.topstats{grid-column:3!important;justify-self:end!important;min-width:0!important}
+@media(max-width:980px){
+  .topbar{display:flex!important;position:sticky!important;gap:7px!important;justify-content:flex-start!important;overflow:hidden!important;padding:0 10px!important}
+  .topleft{display:flex!important;flex:0 1 auto!important;min-width:0!important;gap:5px!important}
+  .topbrand{position:absolute!important;left:50%!important;top:50%!important;transform:translate(-50%,-50%)!important;z-index:1!important;font-size:17px!important;line-height:1!important;max-width:calc(100% - 150px)!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+  .topstats{display:none!important}
+  .topactions,.daystatus{display:none!important}
+  .menubtn,.soundbtn{position:relative!important;z-index:3!important;flex:0 0 auto!important}
+}
+@media(max-width:390px){.topbrand{font-size:15px!important;max-width:calc(100% - 125px)!important}}
