@@ -271,40 +271,102 @@ function cloneKenney(src){
 }
 function addKenneyCityAssets(group,seed,level,opts={}){
   const rng=(()=>{let x=(seed>>>0)||1;return()=>{x=(Math.imul(1664525,x)+1013904223)>>>0;return x/4294967296}})();
-  const count=Math.round(10+level*5);
   const radius=opts.radius||5.4;
-  // Load a small representative subset of the CC0 kit, then reuse cached models.
-  const urls=KENNEY_SUBURBAN.slice(0,Math.min(8,KENNEY_SUBURBAN.length));
+  // Fewer, larger suburban lots at early levels; more lots unlock as the city grows.
+  const count=Math.min(18,6+Math.floor(level*1.35));
+  const urls=KENNEY_SUBURBAN.slice(0,Math.min(10,KENNEY_SUBURBAN.length));
   Promise.all(urls.map(u=>loadKenney(u))).then(models=>{
     if(!group.parent)return;
     const assetGroup=new THREE.Group(); assetGroup.name='Kenney City Kit'; group.add(assetGroup);
-    // Keep Kenney suburban houses in a dedicated outer residential ring.
-    // The procedural city owns the inner/core district, so the two systems never
-    // spawn on top of one another. A small spacing test also prevents Kenney
-    // houses from intersecting each other.
+
+    // The previous implementation used a fixed center-to-center distance. That is
+    // not sufficient because Kenney models have different footprints. Instead,
+    // measure every actual model footprint after scaling/rotation and reject a
+    // candidate whenever its bounding circle would intersect another house.
     const placed=[];
-    const minGap=1.18;
-    const innerRadius=3.45;
-    let attempts=0;
-    while(placed.length<count && attempts<220){
-      attempts++;
-      const a=rng()*Math.PI*2;
-      const r=innerRadius + rng()*Math.max(.8,radius-innerRadius);
-      const x=Math.cos(a)*r;
-      const z=Math.sin(a)*r*.78;
-      if(placed.some(p=>Math.hypot(p.x-x,p.z-z)<minGap)) continue;
-      placed.push({x,z});
-      const src=models[Math.floor(rng()*models.length)];
-      const b=cloneKenney(src);
-      const scale=(0.68+rng()*.24)*(1+level*.025);
-      b.position.set(x,.045,z); b.rotation.y=Math.round(rng()*3)*Math.PI/2; b.scale.setScalar(scale);
-      assetGroup.add(b);
+    const coreClearance=3.65;
+    const outerRadius=Math.min(radius,6.0);
+    const candidates=[];
+    // Deterministic perimeter lots: four sides, then corners/intermediate slots.
+    for(let row=0;row<4;row++){
+      const t=(row+.5)/4;
+      const span=outerRadius*2.0;
+      const inset=.65+row*.10;
+      candidates.push(
+        {x:-outerRadius+inset+t*0,z:-outerRadius+inset},
+        {x: outerRadius-inset,z:-outerRadius+inset+t*0},
+        {x:-outerRadius+inset,z: outerRadius-inset},
+        {x: outerRadius-inset,z: outerRadius-inset}
+      );
     }
-    // A few recognizable CC0 road tiles establish actual streets under the buildings.
+    // Add jittered perimeter candidates so different cities do not look identical.
+    for(let i=0;i<70;i++){
+      const side=Math.floor(rng()*4),t=.08+rng()*.84,j=(rng()-.5)*.34;
+      if(side===0)candidates.push({x:-outerRadius+j,z:(t*2-1)*outerRadius});
+      if(side===1)candidates.push({x: outerRadius+j,z:(t*2-1)*outerRadius});
+      if(side===2)candidates.push({x:(t*2-1)*outerRadius,z:-outerRadius+j});
+      if(side===3)candidates.push({x:(t*2-1)*outerRadius,z: outerRadius+j});
+    }
+
+    let attempts=0;
+    for(const src of models){
+      if(placed.length>=count)break;
+      const repeats=3;
+      for(let rep=0;rep<repeats && placed.length<count;rep++){
+        attempts++;
+        const b=cloneKenney(src);
+        const scale=(0.46+rng()*.13)*(1+level*.012);
+        b.scale.setScalar(scale);
+        b.rotation.y=Math.floor(rng()*4)*Math.PI/2;
+
+        // Compute the real horizontal footprint of this exact Kenney model.
+        const rawBox=new THREE.Box3().setFromObject(b);
+        const rawSize=new THREE.Vector3(); rawBox.getSize(rawSize);
+        const footprint=Math.max(.38,Math.hypot(rawSize.x,rawSize.z)/2);
+        let accepted=false;
+        // Shuffle through deterministic candidates rather than repeatedly guessing
+        // points in already occupied space.
+        for(let cidx=0;cidx<candidates.length && !accepted;cidx++){
+          const c=candidates[(cidx+Math.floor(rng()*candidates.length))%candidates.length];
+          const x=c.x,z=c.z;
+          if(Math.hypot(x,z)<coreClearance+footprint)continue;
+          let clear=true;
+          for(const p of placed){
+            if(Math.hypot(p.x-x,p.z-z)<p.footprint+footprint+.24){clear=false;break;}
+          }
+          if(!clear)continue;
+          b.position.set(x,.045,z);
+          // Recompute after position/rotation; this keeps the collision proxy honest.
+          const worldBox=new THREE.Box3().setFromObject(b);
+          const center=new THREE.Vector3();worldBox.getCenter(center);
+          const worldSize=new THREE.Vector3();worldBox.getSize(worldSize);
+          const actualFootprint=Math.max(.38,Math.hypot(worldSize.x,worldSize.z)/2);
+          if(Math.hypot(center.x,center.z)<coreClearance+actualFootprint)continue;
+          let worldClear=true;
+          for(const p of placed){if(Math.hypot(center.x-p.x,center.z-p.z)<p.footprint+actualFootprint+.24){worldClear=false;break;}}
+          if(!worldClear)continue;
+          b.position.y=.045;
+          assetGroup.add(b);
+          placed.push({x:center.x,z:center.z,footprint:actualFootprint});
+          accepted=true;
+        }
+        if(!accepted)b.traverse(o=>{if(o.isMesh)o.geometry?.dispose?.()});
+      }
+    }
+
+    // Use Kenney road tiles only around the suburban ring. The procedural/core
+    // roads remain separate, preventing road geometry from sitting underneath the
+    // same house lots.
     loadKenney(KENNEY_ROAD).then(src=>{
-      for(let i=-3;i<=3;i++){
-        const a=cloneKenney(src); a.position.set(i*1.8,.025,0); a.rotation.y=Math.PI/2; a.scale.setScalar(1.05); assetGroup.add(a);
-        const b=cloneKenney(src); b.position.set(0,.026,i*1.8); b.scale.setScalar(1.05); assetGroup.add(b);
+      const roadGroup=new THREE.Group(); roadGroup.name='Kenney Suburban Roads'; assetGroup.add(roadGroup);
+      const roadRadius=outerRadius+.15;
+      for(let i=-2;i<=2;i++){
+        const a=cloneKenney(src);a.position.set(i*2.05,.025,-roadRadius);a.rotation.y=0;a.scale.setScalar(.88);roadGroup.add(a);
+        const b=cloneKenney(src);b.position.set(i*2.05,.026, roadRadius);b.rotation.y=Math.PI; b.scale.setScalar(.88);roadGroup.add(b);
+      }
+      for(let i=-1;i<=1;i++){
+        const a=cloneKenney(src);a.position.set(-roadRadius,.027,i*2.05);a.rotation.y=Math.PI/2;a.scale.setScalar(.88);roadGroup.add(a);
+        const b=cloneKenney(src);b.position.set( roadRadius,.028,i*2.05);b.rotation.y=-Math.PI/2;b.scale.setScalar(.88);roadGroup.add(b);
       }
     }).catch(()=>{});
   }).catch(()=>{});
