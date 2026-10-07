@@ -538,3 +538,39 @@ html{scrollbar-width:thin;scrollbar-color:#28556d #04121d}
 }
 @media(max-width:390px){.mobilebrand{display:none!important}.daystatus{margin-left:2px}.daystatus span:nth-child(3){display:none}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))!important}.metric{min-height:76px}.storeitem{grid-template-columns:48px minmax(0,1fr) 56px!important}.storeitem img{width:48px;height:42px}.storeitem strong{display:none}.skillrow{grid-template-columns:38px minmax(0,1fr) 76px!important}.skillrow .mini{font-size:9px}.heroContent{padding-top:17px}.pulsegrid{gap:4px!important}
 }
+
+/* V2.10 — final mobile layout stabilization */
+@media (max-width:980px){
+  html,body,#app{width:100%;max-width:100%;overflow-x:hidden}
+  .game{display:block!important;width:100%;min-height:100vh;overflow-x:hidden}
+  .gamearea{width:100%;max-width:100%;overflow-x:hidden}
+  .topbar{width:100%;min-width:0;overflow:hidden}
+  .topleft{min-width:0;flex:1;display:flex;align-items:center;gap:5px;overflow:hidden}
+  .mobilebrand{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .daystatus{min-width:0;overflow:hidden;white-space:nowrap}
+  .maincontent{width:100%;max-width:100%;overflow:hidden}
+  .subpage,.fullstore,.citiesfull,.fullprogress,.fullskills,.builderlayout{width:100%;max-width:100%;min-width:0}
+  .panel,.buildcard,.storeitem,.skillrow,.citylarge,.opportunity,.moment,.cozy-panel{min-width:0;max-width:100%}
+  .hero-scene canvas{width:100%!important;height:100%!important}
+  .dashboardgrid,.lowergrid{width:100%;max-width:100%;overflow:hidden}
+}
+@media (max-width:650px){
+  .topbar{padding:0 6px!important;gap:4px!important}
+  .menubtn,.soundbtn{flex:0 0 38px!important;width:38px!important;height:38px!important}
+  .mobilebrand{font-size:9px!important;max-width:82px}
+  .daystatus{flex:1;font-size:8px!important}
+  .daystatus b{max-width:72px;overflow:hidden;text-overflow:ellipsis}
+  .hero{width:100%!important}
+  .heroContent{padding-left:12px!important;padding-right:12px!important}
+  .metrics{margin-left:12px!important;margin-right:12px!important}
+  .metric{min-width:0!important;overflow:hidden}
+  .metric strong,.metric small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .subpage{padding-left:8px!important;padding-right:8px!important}
+  .pagehead{min-width:0;overflow:hidden}
+  .pagehead h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .builder3d,.nation3d,.mapscene,.citylarge3d{width:100%!important;max-width:100%!important}
+  .mapscene canvas,.builder3d canvas,.nation3d canvas,.citylarge3d canvas{width:100%!important;max-width:100%!important}
+  .choicegrid,.choicegrid.two{width:100%;max-width:100%}
+  .gamewrap{width:100%;max-width:100%;padding-left:8px!important;padding-right:8px!important}
+  .minigame{width:100%!important;max-width:100%!important}
+}

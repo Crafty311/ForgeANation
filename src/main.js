@@ -366,12 +366,12 @@ function pickNextTrack(){
  if(!AUDIO.tracks.length)return null;
  let next=Math.floor(Math.random()*AUDIO.tracks.length);
  if(AUDIO.tracks.length>1&&next===AUDIO.trackIndex)next=(next+1)%AUDIO.tracks.length;
- AUDIO.trackIndex=next;AUDIO.loopsLeft=1+Math.floor(Math.random()*2);return AUDIO.tracks[next];
+ AUDIO.trackIndex=next;return AUDIO.tracks[next];
 }
 function advanceMusic(){
  if(!soundEnabled())return;
- if(AUDIO.loopsLeft>1){AUDIO.loopsLeft--;const a=AUDIO.tracks[AUDIO.trackIndex];a.currentTime=0;const p=a.play();if(p?.catch)p.catch(()=>{});return;}
- const next=pickNextTrack();if(next){const p=next.play();if(p?.catch)p.catch(()=>{});}
+ const next=pickNextTrack();
+ if(next){next.currentTime=0;const p=next.play();if(p?.catch)p.catch(()=>{});}
 }
 function startMusic(){
  ensureAudio();if(!soundEnabled()||!AUDIO.tracks.length)return;
