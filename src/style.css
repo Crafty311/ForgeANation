@@ -159,3 +159,18 @@ html{scrollbar-width:thin;scrollbar-color:#28556d #04121d}
   .metric strong{font-size:15px!important;letter-spacing:-.01em!important}
   .metric small,.metric em{font-size:7.5px!important}
 }
+
+/* V7.8 — procedural 3D city visualization */
+.city3d,.nation3d{position:relative;overflow:hidden;background:#102b38;isolation:isolate}
+.city3d canvas,.nation3d canvas{display:block;width:100%;height:100%;cursor:grab}
+.city3d canvas:active,.nation3d canvas:active{cursor:grabbing}
+.cityimage.city3d{height:126px;border-bottom:1px solid #173b50}
+.cityimage.city3d>span{z-index:4}
+.citylarge3d{height:230px;width:100%;border-radius:10px 10px 0 0}
+.citylarge3d canvas{min-height:230px}
+.nation3d{min-height:470px;height:470px;border-radius:12px}
+@media(max-width:650px){
+ .cityimage.city3d{height:170px}
+ .citylarge3d{height:210px}.citylarge3d canvas{min-height:210px}
+ .nation3d{height:390px;min-height:390px}
+}
