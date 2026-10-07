@@ -212,8 +212,16 @@ function tttWinner(b){
 }
 function tttAi(b){
  const empty=b.map((v,i)=>v?null:i).filter(v=>v!==null);if(!empty.length)return;
- for(const mark of ['O','X'])for(const i of empty){const x=b.slice();x[i]=mark;if(tttWinner(x)===mark)return i;}
- if(empty.includes(4))return 4;const corners=empty.filter(i=>[0,2,6,8].includes(i));if(corners.length)return corners[Math.floor(Math.random()*corners.length)];return empty[Math.floor(Math.random()*empty.length)];
+ // The town champion is intentionally fallible: it should feel like a cozy
+ // resident challenge, not an unwinnable minimax puzzle. It only plays a
+ // tactical move occasionally, otherwise it chooses a plausible open square.
+ if(Math.random()<0.34){
+  for(const mark of ['O','X'])for(const i of empty){const x=b.slice();x[i]=mark;if(tttWinner(x)===mark)return i;}
+ }
+ if(Math.random()<0.35 && empty.includes(4))return 4;
+ const preferred=empty.filter(i=>[0,2,6,8].includes(i));
+ if(preferred.length&&Math.random()<0.55)return preferred[Math.floor(Math.random()*preferred.length)];
+ return empty[Math.floor(Math.random()*empty.length)];
 }
 function miniGameAction(action,value){
  const n=state.nation,z=cozyFor(n),g=z.activeGame;if(!g)return;let result='';
@@ -812,12 +820,28 @@ function buildNationalScene(host){
   // Every real city becomes a visible urban footprint on the national map.
   const cities=state.nation.cities||[];
   const positions=[];
+  // Place cities with deterministic relaxation so their scaled urban
+  // footprints never visually pile into one another on the national map.
+  const minGap=(a,b)=>2.45+Math.min(1.55,((a.level||1)+(b.level||1))*.075);
   cities.forEach((c,i)=>{
-    const angle=i*2.399963; // golden-angle distribution, deterministic and spread out
-    const rad=i===0?0:3.0+Math.sqrt(i)*2.05;
-    let x=Math.cos(angle)*rad, z=Math.sin(angle)*rad*.70;
-    x=Math.max(-12,Math.min(12,x)); z=Math.max(-9,Math.min(9,z));
-    if(i===0){x=-1.5;z=-1.5;}
+    const angle=i*2.399963, rad=i===0?0:2.8+Math.sqrt(i)*2.18;
+    let x=i===0?-1.5:Math.cos(angle)*rad;
+    let z=i===0?-1.5:Math.sin(angle)*rad*.70;
+    x=Math.max(-11.6,Math.min(11.6,x)); z=Math.max(-8.5,Math.min(8.5,z));
+    for(let pass=0;pass<28;pass++){
+      let moved=false;
+      for(let j=0;j<positions.length;j++){
+        const [px,pz]=positions[j],pc=cities[j]; let dx=x-px,dz=z-pz,dist=Math.hypot(dx,dz);
+        const gap=minGap(c,pc);
+        if(dist<gap){
+          if(dist<.001){dx=Math.cos(angle+.8);dz=Math.sin(angle+.8);dist=1;}
+          const push=(gap-dist)*.58;
+          x+=dx/dist*push;z+=dz/dist*push;moved=true;
+        }
+      }
+      x=Math.max(-11.6,Math.min(11.6,x)); z=Math.max(-8.5,Math.min(8.5,z));
+      if(!moved)break;
+    }
     positions.push([x,z]);
     const cityGroup=new THREE.Group(); cityGroup.position.set(x,.06,z);
     const cLvl=Math.max(1,Math.min(10,c.level||1));
