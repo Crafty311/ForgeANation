@@ -98,7 +98,7 @@ function credits(){return `<div class="credits">Made by Sajid<br><span>Instagram
 function icon(s,cls=''){return `<span class="uiicon ${cls}">${s}</span>`;}
 function topbar(){const n=state.nation;const month=Math.max(1,Math.floor((Date.now()-n.created)/2592000000)%12+1),year=Math.max(1,Math.floor((Date.now()-n.created)/(2592000000*12))+1);return `<header class="topbar"><div class="mobilebrand">FORGE A NATION</div><div class="topstats"><div class="topstat">${icon('◉','goldic')}<span><b>${money(n.money)}</b><small>+${money(income())}/day</small></span></div><div class="topstat">${icon('♟','blueic')}<span><b>${fmt(n.population/1e6)}M</b><small>+8.6K/day</small></span></div><div class="topstat">${icon('★','goldic')}<span><b>${Math.round(n.reputation)}</b><small>Reputation</small></span></div><div class="datebox"><b>Year ${year}, Month ${month}</b><small>☀ Sunny 24°C</small></div></div></header>`;}
 function sidebar(){const items=[['home','⌂','Home'],['map','●','Map'],['cities','▥','Cities'],['buildings','▣','Buildings'],['skills','◈','Skills'],['development','◆','Development'],['store','▤','Store'],['statistics','▥','Statistics'],['history','▤','History'],['settings','⚙','Settings']];return `<aside class="sidebar"><div class="brand"><h1>FORGE<br>A NATION</h1><p>Build. Grow. Lead.</p></div><nav>${items.map(([id,ic,label])=>`<button class="navitem ${state.screen===id?'active':''}" data-screen="${id}">${icon(ic)}<span>${label}</span></button>`).join('')}</nav><div class="quick"><small>Quick Actions</small><button class="gold" data-action="continue">Continue Game</button><button class="outline" data-action="new">＋ New Nation</button></div>${credits()}</aside>`;}
-function hero(){const n=state.nation,l=level();return `<section class="hero"><img src="/hero-art.jpg" alt="Clean illustrated capital city"/><div class="heroShade"></div><div class="heroContent"><div class="welcome"><small>Welcome Back,</small><h1>${esc(n.name)}</h1><p>A small nation with big dreams.</p></div><div class="nationcard"><div class="emblem">✦</div><div class="nationcardbody"><b>${esc(n.name)}</b><span>${l.name}</span><small>Lv. ${l.level}</small><div class="bar"><i style="width:${xpPct()}%"></i></div><em>${Math.floor(n.xp).toLocaleString()} / ${(nextLevel()?.xp||n.xp).toLocaleString()}</em></div></div><button class="gold continue" data-action="continue">▶ &nbsp; Continue Playing</button></div><div class="metrics">${metric('◉','National Wealth',money(n.money),'+'+money(income())+'/day')} ${metric('♟','Population',fmt(n.population/1e6)+'M','+8.6K/day')} ${metric('☺','Happiness',Math.round(n.happiness)+'%','+1.3%')} ${metric('★','Reputation',Math.round(n.reputation),'+2.4%')}</div><aside class="away"><h3>While You Were Away...</h3><div>${icon('◉','goldic')}<b>+${money(n.awayEarned||0)}</b><span>National Income</span></div><div>${icon('♟','greenic')}<b>+12.8K</b><span>Population</span></div><div>${icon('▥','blueic')}<b>+1.2K</b><span>Industrial Output</span></div><div>${icon('◆','goldic')}<b>Education advanced</b><span>to Lv. ${n.skills.education}</span></div><button class="gold" data-action="collect">Collect Rewards</button></aside></section>`;}
+function hero(){const n=state.nation,l=level();return `<section class="hero"><div class="hero-scene" id="hero-scene" aria-label="Artistic 3D national panorama"></div><div class="heroShade"></div><div class="heroContent"><div class="welcome"><small>Welcome Back,</small><h1>${esc(n.name)}</h1><p>A small nation with big dreams.</p></div><div class="nationcard"><div class="emblem">✦</div><div class="nationcardbody"><b>${esc(n.name)}</b><span>${l.name}</span><small>Lv. ${l.level}</small><div class="bar"><i style="width:${xpPct()}%"></i></div><em>${Math.floor(n.xp).toLocaleString()} / ${(nextLevel()?.xp||n.xp).toLocaleString()}</em></div></div><button class="gold continue" data-action="continue">▶ &nbsp; Continue Playing</button></div><div class="metrics">${metric('◉','National Wealth',money(n.money),'+'+money(income())+'/day')} ${metric('♟','Population',fmt(n.population/1e6)+'M','+8.6K/day')} ${metric('☺','Happiness',Math.round(n.happiness)+'%','+1.3%')} ${metric('★','Reputation',Math.round(n.reputation),'+2.4%')}</div><aside class="away"><h3>While You Were Away...</h3><div>${icon('◉','goldic')}<b>+${money(n.awayEarned||0)}</b><span>National Income</span></div><div>${icon('♟','greenic')}<b>+12.8K</b><span>Population</span></div><div>${icon('▥','blueic')}<b>+1.2K</b><span>Industrial Output</span></div><div>${icon('◆','goldic')}<b>Education advanced</b><span>to Lv. ${n.skills.education}</span></div><button class="gold" data-action="collect">Collect Rewards</button></aside></section>`;}
 function metric(ic,title,value,delta){return `<div class="metric">${icon(ic)}<div><small>${title}</small><strong>${value}</strong><em>${delta}</em></div></div>`;}
 function skillsCard(){const n=state.nation;return `<section class="panel skills-panel"><div class="paneltitle"><h2>National Skills</h2><button class="textbtn" data-screen="skills">View All</button></div>${skillDefs.map(d=>`<div class="skillrow"><div class="skillicon ${d.cls}">${d.icon}</div><div><b>${d.name}</b><small>Lv. ${n.skills[d.id]} · ${d.effect}</small></div><button class="mini greenbtn" data-skill="${d.id}">Upgrade<span>${money(skillCost(d.id))}</span></button></div>`).join('')}</section>`;}
 function storeCard(){const n=state.nation;return `<section class="panel store-panel"><div class="paneltitle"><h2>Development Store</h2><button class="textbtn" data-screen="store">View All</button></div><div class="tabs"><button class="active">All</button><button>Economic</button><button>Civic</button><button>Culture</button><button>Luxury</button></div><div class="storelist">${storeDefs.slice(0,6).map(d=>{const ok=level().level>=d.req,can=n.money>=d.cost;return `<div class="storeitem"><img src="/${d.img}" alt=""><div><b>${d.name}</b><small>${d.desc}</small></div><strong>${money(d.cost)}</strong><button class="mini ${ok&&can?'greenbtn':'lockbtn'}" data-buy="${d.id}" ${ok&&can?'':'disabled'}>${ok?'Buy':'🔒'}</button></div>`}).join('')}</div></section>`;}
@@ -119,7 +119,68 @@ function fullSettings(){return listPage('Settings','Keep control of your nation.
 function placeholder(title,sub){return listPage(title,sub,`<div class="placeholder panel"><div class="placeholdericon">◈</div><h2>Coming together.</h2><p>This section uses the same live nation data and will expand as your country develops.</p><button class="gold" data-screen="home">Back Home</button></div>`);}
 
 let citySceneRecords=[];
+let heroSceneRecord=null,heroSceneFrame=null,heroSceneResize=null;
 function disposeCityScenes(){citySceneRecords.forEach(r=>{try{r.renderer.dispose();r.scene.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose())}})}catch{}});citySceneRecords=[];}
+function disposeHeroScene(){
+  if(heroSceneFrame)cancelAnimationFrame(heroSceneFrame); heroSceneFrame=null;
+  if(heroSceneResize){window.removeEventListener('resize',heroSceneResize);heroSceneResize=null;}
+  if(heroSceneRecord){try{heroSceneRecord.scene.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose())}});heroSceneRecord.renderer.dispose();heroSceneRecord.host.innerHTML='';}catch{} heroSceneRecord=null;}
+}
+function buildHeroScene(){
+  const host=$('#hero-scene'); if(!host)return;
+  disposeHeroScene();
+  const width=host.clientWidth||900,height=host.clientHeight||390;
+  const scene=new THREE.Scene();
+  scene.fog=new THREE.FogExp2(0x07131d,.032);
+  const camera=new THREE.PerspectiveCamera(31,width/height,.1,120);camera.position.set(11,7.2,13);camera.lookAt(0,1.8,0);
+  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});renderer.setPixelRatio(Math.min(1.5,devicePixelRatio||1));renderer.setSize(width,height,false);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;host.appendChild(renderer.domElement);
+  scene.background=new THREE.Color(0x07131d);
+  scene.add(new THREE.HemisphereLight(0x9ec9df,0x081019,1.35));
+  const sun=new THREE.DirectionalLight(0xffd6a0,2.5);sun.position.set(-8,12,7);sun.castShadow=true;scene.add(sun);
+  const moon=new THREE.Mesh(new THREE.SphereGeometry(1.05,24,24),new THREE.MeshBasicMaterial({color:0xffe4b5,transparent:true,opacity:.78}));moon.position.set(-7,7,-8);scene.add(moon);
+  const moonGlow=new THREE.PointLight(0xffc77a,1.8,18);moonGlow.position.copy(moon.position);scene.add(moonGlow);
+  const world=new THREE.Group();scene.add(world);
+  const water=new THREE.Mesh(new THREE.PlaneGeometry(38,18,1,1),new THREE.MeshStandardMaterial({color:0x0b4052,roughness:.22,metalness:.3,transparent:true,opacity:.92}));water.rotation.x=-Math.PI/2;water.position.set(0,-.08,4.8);world.add(water);
+  const terrainMat=new THREE.MeshStandardMaterial({color:0x183b3d,roughness:.96,flatShading:true});
+  for(let band=0;band<5;band++){
+    const geo=new THREE.PlaneGeometry(26-band*2.2,6.5-band*.55,18,6);
+    const pos=geo.attributes.position;
+    for(let i=0;i<pos.count;i++){const x=pos.getX(i),y=pos.getY(i);const crest=Math.sin(x*.34+band*1.7)*(.75+band*.13)+Math.sin(x*.72-band)*.25;pos.setZ(i,crest*(1-Math.abs(y)/3.3)*(.7+band*.1));}
+    geo.computeVertexNormals();const m=terrainMat.clone();m.color.setHSL(.50-.02*band,.28,.16+.025*band);
+    const ridge=new THREE.Mesh(geo,m);ridge.rotation.x=-Math.PI/2;ridge.position.set(0,.25+band*.28,-4.2-band*1.45);ridge.scale.y=1.15;world.add(ridge);
+  }
+  const city=new THREE.Group();city.position.set(0,.03,.1);world.add(city);
+  const rng=(()=>{let x=hashCity(`${state.nation?.name||'nation'}:hero`);return()=>{x=(Math.imul(1664525,x)+1013904223)>>>0;return x/4294967296}})();
+  const lvl=Math.max(1,Math.min(8,level().level));
+  const roadMat=new THREE.MeshStandardMaterial({color:0x273c42,roughness:.85});
+  for(let i=0;i<7;i++){const x=-5.2+i*1.75;const road=new THREE.Mesh(new THREE.BoxGeometry(.13,.035,6.8),roadMat);road.position.set(x,.03,0);city.add(road);}
+  for(let i=0;i<5;i++){const z=-2.5+i*1.35;const road=new THREE.Mesh(new THREE.BoxGeometry(10.5,.035,.12),roadMat);road.position.set(0,.035,z);city.add(road);}
+  const buildingMat=[0x8da8b2,0x557a87,0xb0a58d,0x6d8d93,0x9a8b73];
+  const count=28+lvl*8;
+  for(let i=0;i<count;i++){
+    const x=(rng()-.5)*9.5,z=(rng()-.5)*5.3;
+    const h=(.35+rng()*1.25)*(1+lvl*.13)*(rng()<.1+lvl*.012?1.8:1);
+    const w=.28+rng()*.5,d=.28+rng()*.5;
+    const mat=new THREE.MeshStandardMaterial({color:buildingMat[Math.floor(rng()*buildingMat.length)],roughness:.7,metalness:.08});
+    const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);b.position.set(x,h/2+.07,z);b.castShadow=true;city.add(b);
+    if(rng()<.38){const glow=new THREE.Mesh(new THREE.PlaneGeometry(w*.72,h*.45),new THREE.MeshBasicMaterial({color:0x9ee7df,transparent:true,opacity:.22,side:THREE.DoubleSide}));glow.position.set(x-w/2-.006,h*.57,z);glow.rotation.y=Math.PI/2;city.add(glow);}
+  }
+  // signature skyline landmark
+  const tower=new THREE.Mesh(new THREE.BoxGeometry(.58,3.3+lvl*.2,.58),new THREE.MeshStandardMaterial({color:0x9ec2cc,metalness:.3,roughness:.35}));tower.position.set(2.4,1.65+lvl*.1,-.7);tower.castShadow=true;city.add(tower);
+  const spire=new THREE.Mesh(new THREE.ConeGeometry(.12,.9,6),new THREE.MeshStandardMaterial({color:0xd8b15c,metalness:.5,roughness:.3}));spire.position.set(2.4,3.7+lvl*.2,-.7);city.add(spire);
+  // luminous development routes
+  const routeMat=new THREE.LineBasicMaterial({color:0x56d8d4,transparent:true,opacity:.48});
+  for(let r=0;r<5;r++){const pts=[];for(let i=0;i<30;i++){const x=-6+i*.42;const z=-1.9+r*.8+Math.sin(i*.38+r)*.12;pts.push(new THREE.Vector3(x,.08,z));}city.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),routeMat));}
+  // atmospheric particles
+  const pg=new THREE.BufferGeometry(),pp=[];for(let i=0;i<260;i++){pp.push((rng()-.5)*20,1+rng()*7,(rng()-.5)*16-2)}pg.setAttribute('position',new THREE.Float32BufferAttribute(pp,3));scene.add(new THREE.Points(pg,new THREE.PointsMaterial({color:0x91d8d6,size:.025,transparent:true,opacity:.5,depthWrite:false,blending:THREE.AdditiveBlending})));
+  const rec={renderer,scene,camera,world,host};heroSceneRecord=rec;
+  let t=0;
+  const animate=()=>{heroSceneFrame=requestAnimationFrame(animate);t+=.003;world.position.y=Math.sin(t*.55)*.025;world.rotation.y=Math.sin(t*.22)*.012;camera.position.x=11+Math.sin(t*.4)*.45;camera.lookAt(0,1.6,0);renderer.render(scene,camera)};
+  animate();
+  heroSceneResize=()=>{if(!heroSceneRecord)return;const w=host.clientWidth||900,h=host.clientHeight||390;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false)};
+  window.addEventListener('resize',heroSceneResize);
+}
+
 function addCityBuilding(group,x,z,w,h,d,mat,seed,level){
   const g=new THREE.BoxGeometry(w,h,d);const m=new THREE.MeshStandardMaterial({color:mat,roughness:.82,metalness:.08});const b=new THREE.Mesh(g,m);b.position.set(x,h/2+.05,z);group.add(b);
   if(level>=4&&h>1.3){const roof=new THREE.Mesh(new THREE.BoxGeometry(w*.72,.08,d*.72),new THREE.MeshStandardMaterial({color:0xd5b85c,roughness:.7}));roof.position.set(x,h+.09,z);group.add(roof)}
@@ -164,7 +225,7 @@ function buildCityScene(host,c,opts={}){
   const rec={renderer,scene,camera,group,host};citySceneRecords.push(rec);return rec;
 }
 function initCityScenes(){disposeCityScenes();if(!state.nation)return;$$('[data-city-scene]').forEach(host=>{const name=host.dataset.cityScene;const c=state.nation.cities.find(x=>x.name===name);if(c)buildCityScene(host,c)});const nationHost=$('#nation-city-scene');if(nationHost){const aggregate={...state.nation.cities[0],name:state.nation.name+' Nation',level:level().level,citySeed:hashCity(state.nation.name+':nation')};buildCityScene(nationHost,aggregate)};const animate=()=>{if(!citySceneRecords.length)return;citySceneRecords.forEach(r=>{if(r.group&&r.host.offsetWidth>0&&r.host.offsetHeight>0){r.group.rotation.y+=.0007;r.renderer.render(r.scene,r.camera)}});window.__cityFrame=requestAnimationFrame(animate)};cancelAnimationFrame(window.__cityFrame);window.__cityFrame=requestAnimationFrame(animate)}
-function renderGame(){tick();const root=$('#app');let body=home();if(state.screen==='skills')body=fullSkills();else if(['store','development','buildings'].includes(state.screen))body=fullStore();else if(state.screen==='cities')body=fullCities();else if(['statistics','progress'].includes(state.screen))body=fullProgress();else if(state.screen==='map')body=fullMap();else if(state.screen==='history')body=fullHistory();else if(state.screen==='settings')body=fullSettings();else if(state.screen==='diplomacy')body=placeholder('Global Standing','Diplomacy and relations.');root.innerHTML=`<div class="game"><div class="sidebarwrap">${sidebar()}</div><div class="gamearea">${topbar()}${body}</div></div>${state.toast?`<div class="toast">${esc(state.toast)}</div>`:''}`;requestAnimationFrame(initCityScenes);}
+function renderGame(){tick();disposeHeroScene();const root=$('#app');let body=home();if(state.screen==='skills')body=fullSkills();else if(['store','development','buildings'].includes(state.screen))body=fullStore();else if(state.screen==='cities')body=fullCities();else if(['statistics','progress'].includes(state.screen))body=fullProgress();else if(state.screen==='map')body=fullMap();else if(state.screen==='history')body=fullHistory();else if(state.screen==='settings')body=fullSettings();else if(state.screen==='diplomacy')body=placeholder('Global Standing','Diplomacy and relations.');root.innerHTML=`<div class="game"><div class="sidebarwrap">${sidebar()}</div><div class="gamearea">${topbar()}${body}</div></div>${state.toast?`<div class="toast">${esc(state.toast)}</div>`:''}`;requestAnimationFrame(()=>{initHeroScene();initCityScenes()});}
 
 let landingRenderer,landingScene,landingCamera,landingGlobe,landingFrame;
 function disposeLanding(){if(landingFrame)cancelAnimationFrame(landingFrame);landingFrame=null;if(landingRenderer)landingRenderer.dispose();landingRenderer=null;landingScene=null;landingCamera=null;landingGlobe=null;}
