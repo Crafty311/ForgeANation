@@ -839,3 +839,45 @@ html{scrollbar-width:thin;scrollbar-color:#28556d #04121d}
 @media(max-width:1280px) and (min-width:981px){.topstats .topcredit{min-width:150px;padding-left:9px;gap:5px;font-size:9px}.topstats .topcredit b{font-size:10px}.topcredit-links{gap:4px}.topcredit-links a{font-size:9px}}
 @media(max-width:980px){.topstats .topcredit{min-width:0;padding-left:7px;gap:4px;font-size:8px}.topstats .topcredit b{font-size:9px}.topcredit-links{gap:4px}.topcredit-links a{font-size:8px}}
 @media(max-width:650px){.topstats .topcredit{padding-left:5px;gap:3px;font-size:7px}.topstats .topcredit b{font-size:8px}.topcredit-links{gap:3px}.topcredit-links a{font-size:7px}}
+
+/* V2.14.2 — restore one compact day indicator beside New Nation; keep the wordmark centered. */
+.topbar{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important}
+.topleft{min-width:0!important;display:flex!important;align-items:center!important;gap:8px!important}
+.daystatus{display:inline-flex!important;align-items:center!important;gap:5px!important;flex:0 0 auto!important;white-space:nowrap!important;margin-left:2px!important;font-family:Cinzel,"Trajan Pro",Georgia,serif!important;color:#91a6b2!important;font-size:9px!important;letter-spacing:.08em!important}
+.daystatus b{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:31px!important;height:28px!important;padding:0 7px!important;border:1px solid rgba(240,217,154,.2)!important;border-radius:5px!important;background:rgba(20,36,45,.5)!important;color:#f0d99a!important;font-size:10px!important;letter-spacing:.04em!important}
+.topbrand{grid-column:2!important;justify-self:center!important}
+.topstats{grid-column:3!important;justify-self:end!important}
+@media(max-width:1280px) and (min-width:981px){.daystatus{font-size:8px!important}.daystatus b{min-width:28px!important;height:26px!important;padding:0 6px!important}}
+@media(max-width:980px){
+ .topbar{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important;height:60px!important}
+ .topleft{grid-column:1!important;gap:4px!important;overflow:visible!important}
+ .topbrand{grid-column:2!important;position:static!important;transform:none!important;justify-self:center!important;max-width:100%!important}
+ .topstats{grid-column:3!important;display:none!important}
+ .topactions{display:flex!important;flex:0 0 auto!important}
+ .daystatus{display:inline-flex!important;font-size:8px!important;gap:3px!important;margin-left:1px!important}
+ .daystatus b{min-width:25px!important;height:25px!important;padding:0 5px!important;font-size:8px!important}
+}
+@media(max-width:390px){
+ .daystatus span{display:none!important}
+ .daystatus b{min-width:24px!important;padding:0 4px!important}
+ .topbrand{font-size:13px!important;letter-spacing:.035em!important}
+}
+
+/* V2.14.2 — one compact day indicator beside New Nation; centered wordmark remains untouched. */
+.topbar{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important}
+.topleft{min-width:0!important;display:flex!important;align-items:center!important;gap:8px!important}
+.daystatus{display:inline-flex!important;align-items:center!important;gap:5px!important;flex:0 0 auto!important;white-space:nowrap!important;margin-left:2px!important;font-family:Cinzel,"Trajan Pro",Georgia,serif!important;color:#91a6b2!important;font-size:9px!important;letter-spacing:.08em!important}
+.daystatus b{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:31px!important;height:28px!important;padding:0 7px!important;border:1px solid rgba(240,217,154,.2)!important;border-radius:5px!important;background:rgba(20,36,45,.5)!important;color:#f0d99a!important;font-size:10px!important;letter-spacing:.04em!important}
+.topbrand{grid-column:2!important;justify-self:center!important}
+.topstats{grid-column:3!important;justify-self:end!important}
+@media(max-width:1280px) and (min-width:981px){.daystatus{font-size:8px!important}.daystatus b{min-width:28px!important;height:26px!important;padding:0 6px!important}}
+@media(max-width:980px){
+ .topbar{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important;height:60px!important}
+ .topleft{grid-column:1!important;gap:4px!important;overflow:visible!important}
+ .topbrand{grid-column:2!important;position:static!important;transform:none!important;justify-self:center!important;max-width:100%!important}
+ .topstats{grid-column:3!important;display:none!important}
+ .topactions{display:flex!important;flex:0 0 auto!important}
+ .daystatus{display:inline-flex!important;font-size:8px!important;gap:3px!important;margin-left:1px!important}
+ .daystatus b{min-width:25px!important;height:25px!important;padding:0 5px!important;font-size:8px!important}
+}
+@media(max-width:390px){.daystatus span{display:none!important}.daystatus b{min-width:24px!important;padding:0 4px!important}.topbrand{font-size:13px!important;letter-spacing:.035em!important}}
