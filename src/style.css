@@ -574,3 +574,61 @@ html{scrollbar-width:thin;scrollbar-color:#28556d #04121d}
   .gamewrap{width:100%;max-width:100%;padding-left:8px!important;padding-right:8px!important}
   .minigame{width:100%!important;max-width:100%!important}
 }
+/* V2.12 — Nation Collection + National Pulse scale correction */
+.away.pulse{box-sizing:border-box}
+.away.pulse .pulsehead{min-height:28px}
+.away.pulse .pulseevent{min-width:0}
+.away.pulse .pulseevent>section{min-width:0}
+.away.pulse .pulsegrid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.away.pulse .pulsegrid>div{min-width:0;min-height:52px;justify-content:center}
+.away.pulse .pulsegrid b{font-size:12px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.away.pulse .pulsegrid span{font-size:8px;line-height:1.2}
+.away.pulse .pulsefooter{font-size:8px;line-height:1.2}
+.collection{min-width:0}
+.collection .paneltitle{min-width:0}
+.collection .paneltitle h2{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.collectgrid{grid-template-columns:repeat(4,minmax(0,1fr));gap:7px}
+.collectgrid>div{min-width:0;min-height:62px;padding:8px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.collectgrid span{font-size:21px;line-height:1.05}
+.collectgrid small{font-size:8px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.collection .emptybox{grid-column:1/-1}
+@media(max-width:1100px){
+  .collectgrid{grid-template-columns:repeat(4,minmax(0,1fr));overflow:visible}
+}
+@media(max-width:980px){
+  .away.pulse{width:auto;min-height:0}
+  .away.pulse .pulsegrid{gap:6px!important}
+  .away.pulse .pulsegrid>div{min-height:50px;padding:7px 6px}
+  .away.pulse .pulsegrid b{font-size:11px}
+  .away.pulse .pulsegrid span{font-size:8px}
+  .collection .collectgrid{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:9px}
+  .collection .collectgrid>div{min-height:60px;padding:7px 3px}
+}
+@media(max-width:650px){
+  .away.pulse{padding:11px!important}
+  .away.pulse .pulsehead{min-height:24px}
+  .away.pulse .pulseevent{gap:7px;padding:7px 0}
+  .away.pulse .pulseevent b{font-size:10px}
+  .away.pulse .pulseevent small{font-size:8px;line-height:1.25}
+  .away.pulse .pulsegrid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:5px!important}
+  .away.pulse .pulsegrid>div{min-height:48px;padding:6px 5px}
+  .away.pulse .pulsegrid b{font-size:10px}
+  .away.pulse .pulsegrid span{font-size:7px}
+  .away.pulse .pulsefooter{font-size:7px;margin-top:6px}
+  .collection .paneltitle{min-height:46px;height:46px;padding:0 10px}
+  .collection .paneltitle h2{font-size:13px}
+  .collection .textbtn{font-size:8px}
+  .collection .collectgrid{grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;padding:8px}
+  .collection .collectgrid>div{min-height:56px;padding:6px 2px;border-radius:6px}
+  .collection .collectgrid span{font-size:19px}
+  .collection .collectgrid small{font-size:7px}
+}
+@media(max-width:390px){
+  .away.pulse .pulsegrid>div{min-height:46px;padding:5px 4px}
+  .away.pulse .pulsegrid b{font-size:9px}
+  .away.pulse .pulsegrid span{font-size:6.5px}
+  .collection .collectgrid{gap:4px;padding:7px}
+  .collection .collectgrid>div{min-height:52px}
+  .collection .collectgrid span{font-size:18px}
+  .collection .collectgrid small{font-size:6.5px}
+}
