@@ -347,7 +347,7 @@ function toast(msg){state.toast=msg;renderGame();clearTimeout(window.__toast);wi
 function credits(){return `<div class="credits">Made by Sajid<br><span>Instagram: <a href="https://www.instagram.com/sajidaddin" target="_blank" rel="noopener noreferrer">@sajidaddin</a> · <a href="https://www.instagram.com/sajidphobic" target="_blank" rel="noopener noreferrer">@sajidphobic</a></span></div>`;}
 function icon(s,cls=''){return `<span class="uiicon ${cls}">${s}</span>`;}
 /* Audio: CC0 ambient loop + WebAudio tactile UI layer. Browsers require the first user gesture before sound can begin. */
-const AUDIO={ctx:null,ready:false,tracks:[],trackIndex:-1,loopsLeft:0};
+const AUDIO={ctx:null,ready:false,tracks:[],trackIndex:-1,loopTimer:null};
 const BGM_TRACKS=[
  {name:'Relax Background',url:'https://opengameart.org/sites/default/files/relax_background1_0.ogg'},
  {name:'Calm Loop',url:'https://opengameart.org/sites/default/files/Relaxing_0.mp3'},
@@ -370,16 +370,25 @@ function pickNextTrack(){
 }
 function advanceMusic(){
  if(!soundEnabled())return;
+ if(AUDIO.loopTimer){clearTimeout(AUDIO.loopTimer);AUDIO.loopTimer=null;}
  const next=pickNextTrack();
- if(next){next.currentTime=0;const p=next.play();if(p?.catch)p.catch(()=>{});}
+ if(next){next.currentTime=0;const p=next.play();if(p?.catch)p.catch(()=>{});scheduleTrackCutoff(next);}
+}
+function scheduleTrackCutoff(a){
+ if(AUDIO.loopTimer)clearTimeout(AUDIO.loopTimer);
+ AUDIO.loopTimer=setTimeout(()=>{
+   AUDIO.loopTimer=null;
+   if(!soundEnabled()||AUDIO.tracks[AUDIO.trackIndex]!==a)return;
+   a.pause();a.currentTime=0;advanceMusic();
+ },60000);
 }
 function startMusic(){
  ensureAudio();if(!soundEnabled()||!AUDIO.tracks.length)return;
  if(AUDIO.ctx?.state==='suspended')AUDIO.ctx.resume();
  let a=AUDIO.tracks[AUDIO.trackIndex];if(!a||a.ended||a.paused&&AUDIO.trackIndex<0)a=pickNextTrack();
- if(a){const p=a.play();if(p?.catch)p.catch(()=>{});}
+ if(a){const p=a.play();if(p?.catch)p.catch(()=>{});scheduleTrackCutoff(a);}
 }
-function stopMusic(){AUDIO.tracks.forEach(a=>{a.pause();a.currentTime=0;});}
+function stopMusic(){if(AUDIO.loopTimer){clearTimeout(AUDIO.loopTimer);AUDIO.loopTimer=null;}AUDIO.tracks.forEach(a=>{a.pause();a.currentTime=0;});}
 function tone(freq,dur,type='sine',gain=.025,delay=0){if(!soundEnabled()||!AUDIO.ctx)return;const c=AUDIO.ctx,o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.setValueAtTime(freq,c.currentTime+delay);g.gain.setValueAtTime(.0001,c.currentTime+delay);g.gain.exponentialRampToValueAtTime(gain,c.currentTime+delay+.008);g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+delay+dur);o.connect(g).connect(c.destination);o.start(c.currentTime+delay);o.stop(c.currentTime+delay+dur+.02);}
 function sfx(kind='click'){ensureAudio();if(!soundEnabled())return;if(AUDIO.ctx?.state==='suspended')AUDIO.ctx.resume();if(kind==='click'){tone(520,.045,'sine',.018);tone(760,.025,'sine',.008,.018)}else if(kind==='open'){tone(360,.06,'sine',.018);tone(620,.09,'sine',.012,.035)}else if(kind==='success'){tone(520,.07,'sine',.025);tone(660,.08,'sine',.022,.06);tone(820,.13,'sine',.018,.13)}else if(kind==='fail'){tone(190,.11,'triangle',.025);tone(140,.16,'triangle',.018,.08)}else if(kind==='draw'){tone(430,.08,'sine',.018);tone(430,.08,'sine',.012,.11)}else if(kind==='coin'){tone(720,.035,'triangle',.012);tone(920,.035,'triangle',.012,.04);tone(1120,.06,'triangle',.01,.08)}}
 function toggleSound(){state.ui=state.ui||{};state.ui.soundMuted=!state.ui.soundMuted;save();ensureAudio();if(state.ui.soundMuted)stopMusic();else{startMusic();sfx('success')}renderGame();}
