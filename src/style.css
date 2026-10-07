@@ -348,3 +348,72 @@ html{scrollbar-width:thin;scrollbar-color:#28556d #04121d}
   .storeitem{grid-template-columns:52px minmax(0,1fr) 54px}
   .storeitem strong{display:none}
 }
+
+/* V8.1.2 — adaptive shell + polished sidebar states */
+.gamearea{container-type:inline-size;container-name:gamearea}
+/* The collapsed rail should look intentional, not like a narrow scroll box. */
+.sidebar.collapsed nav{scrollbar-width:none;overflow-y:auto}
+.sidebar.collapsed nav::-webkit-scrollbar{width:0;height:0}
+.sidebar.collapsed nav::-webkit-scrollbar-track,.sidebar.collapsed nav::-webkit-scrollbar-thumb{background:transparent}
+.sidebar.collapsed{padding-left:10px;padding-right:10px}
+.sidebar.collapsed .brand{padding-left:0;padding-right:0}
+.sidebar.collapsed .navitem{border-left-width:2px}
+.sidebar.collapsed .navitem.active{background:linear-gradient(90deg,#0a2a3d,#072032)}
+.sidebar.collapsed .navitem:hover{background:#071d2b}
+
+/* Once the sidebar takes enough horizontal room, the hero rearranges its cards
+   instead of allowing the metric row to collide with the nation card. */
+@container gamearea (max-width:1500px){
+  .heroContent{left:32px;width:min(430px,42%)}
+  .nationcard,.continue{width:100%;max-width:430px}
+  .metrics{left:46%;right:29%;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;bottom:24px}
+  .metric{min-height:64px;padding:12px 11px}
+  .metric small{font-size:10px;line-height:1.15}
+  .metric strong{font-size:19px}
+  .away{right:18px;width:min(286px,25%)}
+}
+
+@container gamearea (max-width:1240px){
+  .topbar{padding:0 18px}
+  .topstat{min-width:145px;padding:0 12px}
+  .hero{height:500px}
+  .heroContent{left:26px;top:34px;width:min(390px,43%)}
+  .welcome h1{font-size:50px}
+  .nationcard,.continue{max-width:390px}
+  .metrics{left:45%;right:28%;bottom:22px}
+  .away{top:72px;right:14px;width:25%;min-width:250px}
+}
+
+@container gamearea (max-width:1050px){
+  .topstats .topstat:nth-child(2),.topstats .topstat:nth-child(3){display:none}
+  .topstats{max-width:360px}
+  .hero{height:540px}
+  .heroContent{left:22px;top:28px;width:42%}
+  .welcome h1{font-size:44px}
+  .welcome p{font-size:15px;margin-bottom:17px}
+  .nationcard{min-height:118px;padding:14px}
+  .emblem{width:58px;height:58px;flex-basis:58px;font-size:27px}
+  .metrics{left:44%;right:27%;bottom:20px}
+  .metric{min-height:62px;padding:10px}
+  .metric .uiicon{width:23px;min-width:23px;font-size:17px}
+  .metric small{font-size:9px}
+  .metric strong{font-size:17px}
+  .away{width:27%;min-width:225px;padding:12px}
+}
+
+/* A narrow desktop/tablet shell: keep the hero readable by moving the
+   secondary panel below the primary content instead of overlapping it. */
+@container gamearea (max-width:900px) and (min-width:651px){
+  .hero{height:650px}
+  .heroContent{left:22px;right:22px;width:auto;max-width:none}
+  .nationcard,.continue{max-width:500px}
+  .away{left:22px;right:22px;top:300px;width:auto;min-width:0}
+  .metrics{left:22px;right:22px;top:510px;bottom:auto;grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+
+@media (max-width:980px){
+  .gamearea{container-type:normal}
+  .sidebar.collapsed{padding-left:18px;padding-right:18px}
+  .sidebar.collapsed nav::-webkit-scrollbar{width:7px}
+  .sidebar.collapsed nav{scrollbar-width:thin}
+}
