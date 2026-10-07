@@ -302,30 +302,118 @@ function placeSpacedKenney(group,models,rng,count,zone,scaleRange={min:.7,max:1.
 }
 function addFallbackCityDistrict(group,seed,level,opts={}){
   const rng=seeded(seed),lvl=Math.max(1,Math.min(10,level)),radius=opts.radius||6.4;
-  const district=new THREE.Group();district.name='Living City Fallback District';group.add(district);
-  const roadMat=new THREE.MeshStandardMaterial({color:0x3b4b52,roughness:.92});
-  const lotMat=new THREE.MeshStandardMaterial({color:0x49634f,roughness:1});
-  const roadW=.34, span=radius*1.55;
-  for(let i=-2;i<=2;i++){const h=new THREE.Mesh(new THREE.BoxGeometry(roadW,.045,span*2),roadMat);h.position.set(i*2.45,.04,0);district.add(h);const v=new THREE.Mesh(new THREE.BoxGeometry(span*2,.045,roadW),roadMat);v.position.set(0,.045,i*2.45);district.add(v)}
-  const park=new THREE.Mesh(new THREE.BoxGeometry(radius*1.05,.035,radius*.8),lotMat);park.position.set(radius*.38,.055,-radius*.42);district.add(park);
-  const used=[]; const count=Math.min(34,7+lvl*3);
-  for(let i=0;i<count;i++){
-    let placed=false;
-    for(let a=0;a<80&&!placed;a++){
-      const x=(rng()-.5)*radius*1.9,z=(rng()-.5)*radius*1.9;
-      if(Math.abs(x)<.55||Math.abs(z)<.55||Math.hypot(x-radius*.38,z+radius*.42)<1.0)continue;
-      const w=.38+rng()*.42,d=.38+rng()*.42,h=.45+rng()*(.55+lvl*.16);
-      if(used.some(q=>Math.abs(q.x-x)<(q.w+w)*.55+.12&&Math.abs(q.z-z)<(q.d+d)*.55+.12))continue;
-      const g=new THREE.Group();
-      const bodyMat=new THREE.MeshStandardMaterial({color:new THREE.Color().setHSL(.55+rng()*.08,.18,.38+rng()*.18),roughness:.82});
-      const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),bodyMat);b.position.y=h/2;g.add(b);
-      if(rng()>.35){const roof=new THREE.Mesh(new THREE.BoxGeometry(w*1.05,.06,d*1.05),new THREE.MeshStandardMaterial({color:0x28383d,roughness:.9}));roof.position.y=h+.03;g.add(roof)}
-      if(h>1.15){const cap=new THREE.Mesh(new THREE.BoxGeometry(w*.58,.08,d*.58),new THREE.MeshStandardMaterial({color:0x627c82,roughness:.65,metalness:.15}));cap.position.y=h+.09;g.add(cap)}
-      g.position.set(x,.06,z);g.rotation.y=Math.floor(rng()*4)*Math.PI/2;district.add(g);used.push({x,z,w,d});placed=true;
+  const city=new THREE.Group();city.name='Living City';group.add(city);
+  const mat=(color,rough=.85,metal=0)=>new THREE.MeshStandardMaterial({color,roughness:rough,metalness:metal});
+  const roadMat=mat(0x34434a,.96),sideMat=mat(0x8b9694,.9),grassMat=mat(0x52705a,1),roofMat=mat(0x9b5548,.88),wallPalette=[0xe6d2b5,0xd9e0d2,0xc8d8df,0xe3c6a7,0xd8c5df,0xcbd8c1];
+  const addBox=(w,h,d,color,x,y,z,parent=city,rough=.82)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color,rough));o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;parent.add(o);return o};
+  const addRoad=(x,z,w,d)=>{addBox(w,.045,d,0x34434a,x,.035,z,city,.96);addBox(w+.05,.025,d+.05,0x737d7d,x,.058,z,city,.98)};
+  const span=radius*1.82, street=.62;
+  // Planned road grid with a wider boulevard and secondary streets.
+  addRoad(0,0,span,street*1.15); addRoad(0,0,street*1.15,span);
+  [-3.7,3.7].forEach(v=>{addRoad(v,0,.42,span);addRoad(0,v,span,.42)});
+  if(lvl>=4){addRoad(0,-5.45,span,.72);addRoad(-5.45,0,.72,span)}
+  // Lane markings and crossings make the road network read clearly.
+  const markMat=mat(0xe8d9a1,.7);
+  for(const v of [-3.7,0,3.7]){
+    for(let i=-4;i<=4;i++){
+      if(Math.abs(i)<1) continue;
+      addBox(.045,.008,.42,0xe7dba8,v,.064,i*1.15,city,.75);
+      addBox(.42,.008,.045,0xe7dba8,i*1.15,.064,v,city,.75);
     }
   }
-  const trees=new THREE.Group();trees.name='Green Corridors';district.add(trees);
-  for(let i=0;i<Math.min(22,6+lvl*2);i++){const x=radius*.38+(rng()-.5)*radius*.75,z=-radius*.42+(rng()-.5)*radius*.5;const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.035,.05,.28,6),new THREE.MeshStandardMaterial({color:0x5a4938}));trunk.position.set(x,.2,z);const crown=new THREE.Mesh(new THREE.IcosahedronGeometry(.22+rng()*.12,1),new THREE.MeshStandardMaterial({color:0x3f7958,roughness:1}));crown.position.set(x,.48,z);trees.add(trunk,crown)}
+  // Blocks: generous lots around streets, with parks/open land rather than a wall of buildings.
+  const blocks=[[-1.8,-1.8],[-1.8,1.8],[1.8,-1.8],[1.8,1.8],[-4.9,-4.8],[-4.9,4.8],[4.9,-4.8],[4.9,4.8]];
+  const used=[];
+  function free(x,z,w,d,pad=.12){return !used.some(q=>Math.abs(q.x-x)<(q.w+w)/2+pad&&Math.abs(q.z-z)<(q.d+d)/2+pad)}
+  function house(x,z,scale=1,variant=0){
+    const w=(.72+rng()*.28)*scale,d=(.68+rng()*.25)*scale,h=(.48+rng()*.18)*scale;
+    if(!free(x,z,w,d,.16))return false; used.push({x,z,w,d});
+    const g=new THREE.Group();g.position.set(x,.06,z);g.rotation.y=Math.floor(rng()*4)*Math.PI/2;
+    const wall=mat(wallPalette[variant%wallPalette.length],.9);const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),wall);body.position.y=h/2;body.castShadow=true;g.add(body);
+    const roof=new THREE.Mesh(new THREE.ConeGeometry(Math.max(w,d)*.76,Math.max(.26,.30*scale),4),mat([0x9d5649,0x6d5c50,0x7c4e63,0x4f6f69][variant%4],.88));roof.rotation.y=Math.PI/4;roof.position.y=h+.14;roof.scale.set(1,.72,Math.max(.8,w/d));roof.castShadow=true;g.add(roof);
+    // porch + door + windows = the small cute houses the earlier city had.
+    const porch=addBox(w*.34,.06,.24,0xbba98d,0,.04,d*.62,g,.9);porch.position.z=d*.62;
+    const door=addBox(w*.18,h*.46,.035,0x594b43,0,h*.29,d/2+.018,g,.75);
+    for(const sx of [-1,1]) addBox(w*.16,h*.20,.035,0xaecbd0,sx*w*.25,h*.58,d/2+.02,g,.5);
+    city.add(g);return true;
+  }
+  // Residential neighbourhoods: many small homes, but deliberately spaced.
+  const houseCount=Math.min(30,10+lvl*2);
+  for(let i=0;i<houseCount;i++){
+    const side=i%4, base=side<2?(side?1:-1):0;
+    let x,z;
+    if(side<2){x=base*(1.9+rng()*3.0);z=(rng()-.5)*8.7}else{z=base*(1.9+rng()*3.0);x=(rng()-.5)*8.7}
+    if(Math.abs(x)<.9||Math.abs(z)<.9)continue;
+    house(x,z,.78+rng()*.30,i);
+  }
+  // Apartments and mid-rise buildings around the centre.
+  const midCount=Math.min(9,2+Math.floor(lvl*.8));
+  for(let i=0;i<midCount;i++){
+    const x=(rng()-.5)*4.9,z=(rng()-.5)*4.9,w=.7+rng()*.55,d=.65+rng()*.5,h=.9+rng()*(.55+lvl*.12);
+    if(Math.abs(x)<.75||Math.abs(z)<.75)continue;
+    if(!free(x,z,w,d,.18))continue;used.push({x,z,w,d});
+    addBox(w,h,d,[0xb9c9cb,0xd5c3a9,0x9eafb9,0xcab6a7][i%4],x,.06+h/2,z,city,.72);
+    for(let fy=.28;fy<h-.08;fy+=.28)for(let sx=-1;sx<=1;sx++)if(rng()>.25)addBox(.11,.09,.025,0xe5d7a6,x+sx*w*.25,fy,z+d/2+.015,city,.45);
+    addBox(w*.85,.08,d*.85,[0x596a70,0x806252,0x59636a][i%3],x,h+.10,z,city,.9);
+  }
+  // Downtown shops / civic buildings.
+  const shops=[[-.95,-.95],[.95,-.95],[-.95,.95],[.95,.95]];
+  shops.slice(0,Math.min(4,2+Math.floor(lvl/2))).forEach((q,i)=>{
+    const [x,z]=q,w=.78,d=.62,h=.55+.08*(i%2);addBox(w,h,d,[0xd8a15e,0x83aeb1,0xc47d73,0x9c9f6c][i],x,.06+h/2,z,city,.68);
+    addBox(w*.82,.13,.035,0xf1d38a,x,h*.72,z+d/2+.02,city,.45);
+    for(let k=-1;k<=1;k++)addBox(.12,.12,.03,0x8fb8bd,x+k*.22,h*.40,z+d/2+.022,city,.4);
+  });
+  // Central civic plaza / fountain.
+  const plaza=addBox(1.75,.035,1.35,0x87999a,0,.055,0,city,.95);plaza.rotation.y=.12;
+  const fountain=new THREE.Mesh(new THREE.CylinderGeometry(.30,.38,.12,20),mat(0xb8c8ca,.55,.15));fountain.position.set(0,.12,0);city.add(fountain);
+  const water=new THREE.Mesh(new THREE.CylinderGeometry(.23,.23,.025,20),mat(0x76b6c7,.28,.05));water.position.set(0,.20,0);city.add(water);
+  // Parks / green pockets.
+  const parkSpots=[[3.9,-3.9],[-3.9,3.9],[4.0,3.7],[-4.0,-3.7]];
+  const parkCount=Math.min(4,1+Math.floor(lvl/2));
+  parkSpots.slice(0,parkCount).forEach(([x,z],pi)=>{
+    addBox(2.0,.025,1.55,0x58775d,x,.055,z,city,1);
+    for(let i=0;i<7+lvl;i++){
+      const tx=x+(rng()-.5)*1.7,tz=z+(rng()-.5)*1.25;
+      const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.035,.05,.28,6),mat(0x67513e,1));trunk.position.set(tx,.21,tz);trunk.castShadow=true;city.add(trunk);
+      const crown=new THREE.Mesh(new THREE.SphereGeometry(.18+rng()*.10,7,6),mat([0x477052,0x5c8060,0x3e684e][i%3],1));crown.position.set(tx,.46,tz);crown.castShadow=true;city.add(crown);
+    }
+    // benches.
+    for(let b=0;b<2;b++)addBox(.38,.06,.10,0x765f49,x-.55+b*1.1,.16,z+.45,city,.95);
+  });
+  // Street furniture: lamps, signs, traffic islands and parked cars.
+  const lampMat=mat(0x263237,.55,.55),glowMat=mat(0xffe8a8,.25,.1);
+  for(const [x,z] of [[-3.7,-1.0],[-3.7,1.0],[3.7,-1.0],[3.7,1.0],[-1,-3.7],[1,-3.7],[-1,3.7],[1,3.7]]){
+    const pole=new THREE.Mesh(new THREE.CylinderGeometry(.025,.035,.62,7),lampMat);pole.position.set(x,.34,z);city.add(pole);
+    const bulb=new THREE.Mesh(new THREE.SphereGeometry(.07,7,5),glowMat);bulb.position.set(x,.68,z);city.add(bulb);
+  }
+  for(let i=0;i<Math.min(8,3+lvl);i++){
+    const x=(rng()-.5)*7.6,z=(rng()-.5)*7.6;
+    if(Math.abs(x%3.7)<.6||Math.abs(z%3.7)<.6)continue;
+    const car=addBox(.22,.08,.42,[0xc85f56,0x5f83a4,0xd7b35b,0x8a9b8f][i%4],x,.09,z,city,.62);car.rotation.y=rng()*Math.PI;
+    addBox(.15,.055,.18,0x8faeb5,x,.16,z,city,.5);
+  }
+  // Higher levels gain a hospital, school, stadium/industrial edge and skyline landmarks.
+  if(lvl>=3){
+    addBox(1.05,.55,.72,0xd7d9d2,-4.7,.33,-1.5,city,.7);addBox(.16,.30,.06,0xc95050,-4.7,.65,-1.88,city,.5); // hospital
+    addBox(1.15,.38,.85,0xc8b889,4.65,.23,1.4,city,.8); // school
+  }
+  if(lvl>=5){
+    const stadium=new THREE.Mesh(new THREE.TorusGeometry(.72,.20,8,24),mat(0x748b9a,.72));stadium.rotation.x=Math.PI/2;stadium.position.set(4.35,.22,-4.15);city.add(stadium);addBox(1.0,.16,.72,0x718a62,4.35,.13,-4.15,city,1);
+  }
+  if(lvl>=6){
+    addBox(1.05,1.7,.72,0x7e9da5,0,.86,-3.75,city,.5);for(let y=.35;y<1.55;y+=.28)addBox(.14,.09,.03,0xd8d7b0,-.25,y,-3.38,city,.4);addBox(.22,2.15,.22,0xcbd9dc,2.35,1.08,-2.55,city,.35);
+  }
+  // Industrial edge / warehouse district.
+  if(lvl>=4){for(let i=0;i<3+Math.floor(lvl/2);i++){const x=-4.6+rng()*.9,z=-1.8+rng()*4.0;addBox(.85,.45,.72,0x78817e,x,.285,z,city,.9);addBox(.68,.12,.08,0xa7a79b,x,.57,z+.37,city,.7)}}
+  // Trees along boulevards and outskirts.
+  for(let i=0;i<16+lvl*2;i++){
+    const x=(rng()-.5)*10,z=(rng()-.5)*10;
+    if(Math.abs(x)<1.0||Math.abs(z)<1.0)continue;
+    const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.035,.045,.25,6),mat(0x654d3a,1));trunk.position.set(x,.18,z);city.add(trunk);
+    const crown=new THREE.Mesh(new THREE.SphereGeometry(.16+rng()*.10,7,6),mat([0x477052,0x64865d,0x3e684e][i%3],1));crown.position.set(x,.42,z);crown.castShadow=true;city.add(crown);
+  }
+  // Level-dependent skyline glow: more development, but still plenty of breathing room.
+  if(lvl>=7){for(let i=0;i<4;i++){const x=-2.5+i*1.65,z=-2.3-rng()*1.4;const h=1.6+rng()*1.2;addBox(.42,h,.42,[0x657f88,0x8c7771,0x6e8890,0x7f7d71][i],x,h/2+.06,z,city,.5);}}
 }
 
 function addKenneyCityAssets(group,seed,level,opts={}){
@@ -345,10 +433,10 @@ function addKenneyCityAssets(group,seed,level,opts={}){
     const district=new THREE.Group();district.name='Kenney Districts';city.add(district);
     const coreR=Math.min(2.7+lvl*.32,5.0),worldR=radius;
     if(roads.length){const rg=new THREE.Group();rg.name='Kenney Roads';district.add(rg);const road=roads[0];const span=worldR*1.55;for(let i=-2;i<=2;i++){const a=cloneKenney(road);a.position.set(i*2.7,.018,-span);a.scale.setScalar(.92);rg.add(a);const b=cloneKenney(road);b.position.set(i*2.7,.019,span);b.rotation.y=Math.PI;b.scale.setScalar(.92);rg.add(b)}for(let i=-1;i<=1;i++){const a=cloneKenney(road);a.position.set(-span,.019,i*2.7);a.rotation.y=Math.PI/2;a.scale.setScalar(.92);rg.add(a);const b=cloneKenney(road);b.position.set(span,.019,i*2.7);b.rotation.y=-Math.PI/2;b.scale.setScalar(.92);rg.add(b)}}
-    if(suburban.length){const rg=new THREE.Group();rg.name='Residential';district.add(rg);placeSpacedKenney(rg,suburban,rng,Math.min(14,3+lvl),{x0:-worldR,x1:worldR,z0:-worldR,z1:worldR},{min:.55,max:.86},.95)}
-    if(commercial.length&&lvl>=2){const cg=new THREE.Group();cg.name='Commercial Core';district.add(cg);placeSpacedKenney(cg,commercial,rng,Math.min(7,1+Math.floor(lvl*.65)),{x0:-coreR,x1:coreR,z0:-coreR,z1:coreR},{min:.55,max:.82},1.15)}
-    if(industrial.length&&lvl>=3){const ig=new THREE.Group();ig.name='Industrial District';district.add(ig);placeSpacedKenney(ig,industrial,rng,Math.min(5,1+Math.floor(lvl/2)),{x0:-worldR,x1:-worldR*.48,z0:-worldR*.72,z1:worldR*.72},{min:.52,max:.78},1.2)}
-    if(nature.length){const pg=new THREE.Group();pg.name='Parks and Green Corridors';district.add(pg);const parkCount=Math.min(4,1+Math.floor(lvl/3));for(let p=0;p<parkCount;p++){const cx=(p%2?1:-1)*(worldR*.48),cz=(p<2?-1:1)*(worldR*.43);for(let i=0;i<4+lvl;i++){const t=cloneKenney(nature[Math.floor(rng()*nature.length)]);t.scale.setScalar(.28+rng()*.34);t.position.set(cx+(rng()-.5)*2.2,.04,cz+(rng()-.5)*1.7);t.rotation.y=rng()*Math.PI*2;pg.add(t)}}}
+    if(suburban.length){const rg=new THREE.Group();rg.name='Residential';district.add(rg);placeSpacedKenney(rg,suburban,rng,Math.min(24,7+lvl*2),{x0:-worldR,x1:worldR,z0:-worldR,z1:worldR},{min:.55,max:.86},.95)}
+    if(commercial.length&&lvl>=2){const cg=new THREE.Group();cg.name='Commercial Core';district.add(cg);placeSpacedKenney(cg,commercial,rng,Math.min(12,2+Math.floor(lvl*.9)),{x0:-coreR,x1:coreR,z0:-coreR,z1:coreR},{min:.55,max:.82},1.15)}
+    if(industrial.length&&lvl>=3){const ig=new THREE.Group();ig.name='Industrial District';district.add(ig);placeSpacedKenney(ig,industrial,rng,Math.min(8,2+Math.floor(lvl*.7)),{x0:-worldR,x1:-worldR*.48,z0:-worldR*.72,z1:worldR*.72},{min:.52,max:.78},1.2)}
+    if(nature.length){const pg=new THREE.Group();pg.name='Parks and Green Corridors';district.add(pg);const parkCount=Math.min(4,1+Math.floor(lvl/3));for(let p=0;p<parkCount;p++){const cx=(p%2?1:-1)*(worldR*.48),cz=(p<2?-1:1)*(worldR*.43);for(let i=0;i<7+lvl*2;i++){const t=cloneKenney(nature[Math.floor(rng()*nature.length)]);t.scale.setScalar(.28+rng()*.34);t.position.set(cx+(rng()-.5)*2.2,.04,cz+(rng()-.5)*1.7);t.rotation.y=rng()*Math.PI*2;pg.add(t)}}}
     const plaza=new THREE.Mesh(new THREE.CircleGeometry(Math.min(1.05,.45+lvl*.07),32),new THREE.MeshStandardMaterial({color:0x6b8577,roughness:1}));plaza.rotation.x=-Math.PI/2;plaza.position.y=.025;district.add(plaza);
   }).catch(()=>addFallbackCityDistrict(group,seed,lvl,opts));
 }
