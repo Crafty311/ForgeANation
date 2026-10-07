@@ -202,3 +202,149 @@ html{scrollbar-width:thin;scrollbar-color:#28556d #04121d}
 .reportgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:10px}.reportgrid>div{background:#071b29;border:1px solid #1b3a4d;border-radius:6px;padding:8px;text-align:center}.reportgrid b{display:block;font-size:11px;color:#e7c66d}.reportgrid small{font-size:7px;color:#718995}.reportcard p{margin:0;padding:0 12px 11px;color:#8fa5af;font-size:9px}.cozyextras{grid-template-columns:1fr 1fr 1fr}
 @media(max-width:1100px){.cozyextras{grid-template-columns:1fr 1fr}.reportcard{grid-column:span 2}}
 @media(max-width:980px){.sidebar{transform:translateX(-102%)}.sidebar.mobile-open{transform:translateX(0)}.sidebar.collapsed{transform:translateX(-102%)}.sidebar.collapsed.mobile-open{transform:translateX(0)}.cozyextras{grid-template-columns:1fr}.reportcard{grid-column:auto}}
+
+/* V8.1.1 — interface scale, navigation visibility, and responsive metric cards */
+.sidebar{overflow:hidden}
+.sidebar nav{flex:1;min-height:0;max-height:none;overflow-y:auto;overflow-x:hidden;padding-bottom:8px}
+.sidebar nav::-webkit-scrollbar{width:7px}
+.sidebar nav::-webkit-scrollbar-track{background:#061724;border-radius:8px}
+.sidebar nav::-webkit-scrollbar-thumb{background:#3a687c;border-radius:8px}
+.sidebar nav::-webkit-scrollbar-thumb:hover{background:#527f91}
+.sidebar.collapsed nav{padding-left:5px;padding-right:5px}
+.sidebar.collapsed .navitem{width:100%;min-height:52px;height:52px;padding:0;border-left:3px solid transparent;justify-content:center;gap:0;border-radius:0 8px 8px 0}
+.sidebar.collapsed .navitem .uiicon{display:inline-grid;width:34px;height:34px;min-width:34px;flex:0 0 34px;font-size:20px;line-height:1;color:#b9cbd2;opacity:1;visibility:visible}
+.sidebar.collapsed .navitem.active .uiicon{color:var(--gold2)}
+.sidebar.collapsed .navitem:hover .uiicon{color:#fff}
+.sidebar.collapsed .navitem{position:relative}
+.sidebar.collapsed .navitem:hover::after{content:attr(title);position:absolute;left:58px;top:50%;transform:translateY(-50%);z-index:200;white-space:nowrap;background:#0a2230;border:1px solid #31586b;color:#edf4f5;border-radius:6px;padding:7px 9px;font-size:11px;box-shadow:0 8px 20px rgba(0,0,0,.3);pointer-events:none}
+
+/* Give the desktop header a little more breathing room without making it taller. */
+.topbar{gap:10px}
+.topbar>.menubtn{margin-right:2px}
+
+/* Metric cards: never squeeze the label into an unreadable single line. */
+.metrics{left:40%;right:27%;gap:8px}
+.metric{min-width:0;padding:12px 11px;gap:9px}
+.metric .uiicon{width:27px;min-width:27px;font-size:19px}
+.metric small{font-size:10px;line-height:1.15;white-space:normal;overflow-wrap:anywhere}
+.metric strong{font-size:19px;line-height:1.1;margin-top:2px}
+.metric em{font-size:9px;line-height:1.15;white-space:normal}
+
+/* The home dashboard should breathe at common laptop widths. */
+@media (max-width:1450px) and (min-width:981px){
+  .game{grid-template-columns:224px minmax(0,1fr)}
+  .sidebar{width:224px}
+  .metrics{left:39%;right:28%;grid-template-columns:repeat(2,minmax(0,1fr));bottom:22px}
+  .metric{min-height:58px}
+  .away{width:286px;right:18px}
+  .heroContent{left:34px}
+  .nationcard,.continue{width:400px}
+  .welcome h1{font-size:54px}
+}
+
+@media (max-width:1100px) and (min-width:981px){
+  .game{grid-template-columns:208px minmax(0,1fr)}
+  .sidebar{width:208px}
+  .topbar{padding:0 16px}
+  .topstat{min-width:145px;padding:0 12px}
+  .heroContent{left:24px;width:390px}
+  .nationcard,.continue{width:370px}
+  .metrics{left:38%;right:25%;bottom:18px}
+}
+
+/* Mobile: the navigation is a drawer, the hero becomes a clean vertical stack,
+   and metric cards are deliberately large enough to read at a glance. */
+@media (max-width:980px){
+  .sidebar{overflow:hidden}
+  .sidebar nav{flex:1;max-height:none;min-height:0;overflow-y:auto;padding:10px 2px 14px}
+  .sidebar .navitem{min-height:50px;height:50px;font-size:14px}
+  .sidebar .navitem .uiicon{font-size:19px}
+  .sidebar .quick{flex:0 0 auto}
+  .sidebar .credits{flex:0 0 auto;padding-bottom:4px}
+  .hero{height:auto;min-height:760px}
+  .heroContent{left:18px;right:18px;top:24px;width:auto}
+  .welcome h1{font-size:clamp(42px,10vw,58px)}
+  .nationcard,.continue{width:min(100%,460px)}
+  .away{left:18px;right:18px;top:390px;width:auto}
+  .metrics{left:18px;right:18px;top:620px;bottom:auto;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .metric{min-height:70px;padding:11px 12px}
+  .metric small{font-size:10px}
+  .metric strong{font-size:20px}
+  .metric em{font-size:9px}
+}
+
+@media (max-width:650px){
+  .topbar{height:62px;padding:0 9px;gap:5px}
+  .menubtn{width:42px;height:42px;flex-basis:42px;font-size:20px;border-radius:9px}
+  .mobilebrand{font-size:10px!important;letter-spacing:.02em}
+  .daystatus{font-size:9px;gap:4px;margin-left:3px}
+  .daystatus b{font-size:9px;padding:6px 7px}
+  .hero{min-height:790px}
+  .heroContent{top:17px;left:12px;right:12px}
+  .welcome small{font-size:15px}
+  .welcome h1{font-size:48px}
+  .welcome p{font-size:14px;margin-bottom:16px}
+  .nationcard{min-height:112px;padding:14px;gap:12px}
+  .emblem{width:54px;height:54px;flex-basis:54px;font-size:25px}
+  .nationcardbody b{font-size:16px}
+  .continue{margin-top:10px;font-size:15px;min-height:48px}
+  .away{left:12px;right:12px;top:346px;padding:13px}
+  .away h3{font-size:15px}
+  .away>div{grid-template-columns:24px 82px minmax(0,1fr);padding:7px 0}
+  .metrics{left:12px;right:12px;top:590px;gap:8px}
+  .metric{min-height:82px;padding:11px 10px;gap:7px}
+  .metric .uiicon{width:25px;min-width:25px;font-size:18px}
+  .metric small{font-size:10px}
+  .metric strong{font-size:19px}
+  .metric em{font-size:9px}
+  .cozy-panel{margin:8px 8px 0}
+  .cozy-panel .paneltitle h2{font-size:15px}
+  .apbadge{font-size:9px}
+  .endday{min-height:42px!important;font-size:11px!important;padding:8px 10px!important}
+  .daily-event{padding:10px}
+  .daily-event b{font-size:11px}
+  .daily-event span{font-size:9px}
+  .citypick{font-size:10px}
+  .citypick select{min-height:44px;font-size:14px;max-width:none;flex:1}
+  .moment{padding:12px;grid-template-columns:42px minmax(0,1fr)}
+  .momenticon{width:42px;height:42px}
+  .moment b{font-size:13px}
+  .moment small{font-size:10px}
+  .moment em{font-size:9px}
+  .moment button{min-height:44px;font-size:11px}
+  .paneltitle{min-height:52px;height:auto;padding:10px 12px}
+  .paneltitle h2{font-size:15px}
+  .skillrow{min-height:74px;grid-template-columns:42px minmax(0,1fr) 82px;padding:9px 10px}
+  .skillicon{width:42px;height:42px}
+  .skillrow b{font-size:13px}
+  .skillrow small{font-size:9px;white-space:normal;line-height:1.25}
+  .skillrow .mini{min-height:44px;font-size:10px}
+  .storeitem{grid-template-columns:58px minmax(0,1fr) 70px 58px;gap:8px;padding:9px}
+  .storeitem img{width:58px;height:48px}
+  .storeitem b{font-size:11px}
+  .storeitem small{font-size:8px}
+  .storeitem strong{font-size:10px}
+  .storeitem button{min-height:44px}
+  .citystats>div{padding:9px 7px}
+  .citystats small{font-size:8px}
+  .citystats b{font-size:11px}
+  .citystats em{font-size:8px}
+  .buildingrow{min-height:58px}
+  .buildingrow .mini{min-height:44px}
+}
+
+@media (max-width:390px){
+  .topbar{padding:0 7px}
+  .daystatus span:nth-child(2),.daystatus span:nth-child(3){display:none}
+  .mobilebrand{display:none!important}
+  .hero{min-height:820px}
+  .welcome h1{font-size:43px}
+  .away{top:340px}
+  .metrics{top:585px}
+  .metric{min-height:86px}
+  .metric small{font-size:9px}
+  .metric strong{font-size:18px}
+  .metric em{font-size:8px}
+  .storeitem{grid-template-columns:52px minmax(0,1fr) 54px}
+  .storeitem strong{display:none}
+}
