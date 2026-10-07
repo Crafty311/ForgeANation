@@ -1,34 +1,34 @@
-# Forge a Nation V7.12 — Kenney City Overhaul
+# Forge a Nation 8.1 — Cozy Nation Life Loop
 
-## City rendering
-The old placeholder/procedural building and tree library has been removed from the active city renderer.
+V8.1 builds on V8.0's cozy nation layer and replaces the confusing real-time day/year clock with a clear in-game calendar.
 
-Cities now use a district-based Kenney-first layout:
-- City Kit (Suburban): sparse residential neighborhoods
-- City Kit (Commercial): compact downtown/commercial core
-- City Kit (Industrial): separated industrial edge
-- City Kit (Roads): readable road network
-- Nature Kit: parks, trees, rocks and green corridors
+## Daily loop
+- 10 Activity Points maximum per day.
+- Activities cost 1–2 AP.
+- After 3 activities, End Day becomes available.
+- End Day processes national/city income, population, XP, happiness and citizen reactions.
+- A daily event changes the feel/rewards of each day.
+- 30 in-game days make one year.
+- Seasons rotate through Spring, Summer, Autumn and Winter.
 
-The renderer deliberately leaves substantial open land and plaza space. Density increases with city progression instead of filling the entire map at every level.
+## Cozy systems
+- Daily activities and city-specific projects.
+- Daily events.
+- Mailbox with resident reactions.
+- Keepsake/collection discoveries.
+- Daily report card.
+- Existing 3D city visuals reflect cozy projects such as parks, cafés, markets, libraries and festivals.
+- Existing nation map, city progression, buildings, skills and store remain intact.
 
-Models are loaded at runtime from HidenCod's public Kenney CC0 model library, which documents the packs as Kenney assets under CC0:
-https://github.com/Hidencod/tge-assets
+## Navigation/UI
+- YouTube-style collapsible desktop sidebar.
+- Scrollable sidebar with all options accessible.
+- Mobile left drawer with scrim and automatic close after selection.
+- Responsive desktop/tablet/mobile scaling.
+- Touch-friendly controls.
 
-Official Kenney sources:
-https://kenney.nl/assets/city-kit-suburban
-https://kenney.nl/assets/city-kit-commercial
-https://kenney.nl/assets/city-kit-industrial
-https://kenney.nl/assets/city-kit-roads
-https://kenney.nl/assets/nature-kit
-https://kenney.nl/assets/building-kit
-https://kenney.nl/assets/retro-urban-kit
+## Save compatibility
+The existing V8.0 and earlier save keys remain available for migration. V8.1 adds its daily-loop fields automatically.
 
-## Important
-Building Kit and Retro Urban Kit are documented in the README as candidate future district packs, but they are not falsely claimed as runtime-integrated in this build because the public runtime catalog used here does not expose those two packs. The active renderer only loads assets that can be resolved from the runtime catalog.
-
-No proprietary ThreeUI assets are included.
-
-
-# V8.0 — Cozy Nation
-Adds daily Little Things moments, city selection, local projects that persist into city visuals, ambient citizens, city-specific growth, daily streaks, and a more approachable life-sim loop. V7.13/V7.14 city and national-map foundations are preserved.
+## Build
+The archive intentionally does not include node_modules. Install dependencies with `npm install`, then run `npm run build`.
