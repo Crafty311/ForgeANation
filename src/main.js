@@ -229,7 +229,6 @@ function initHeroScene(){
   // Dense skyline: based on the MIT-licensed THREEx.ProceduralCity approach rather than a custom static illustration.
   const city=new THREE.Group(); city.position.set(1.1,.02,-2.8); world.add(city);
   const lvl=Math.max(1,Math.min(10,level().level));
-  addProceduralCityDistrict(city,hashCity(`${state.nation?.name||'nation'}:hero-city`),lvl,{radius:5.8,density:1.05,hero:true,road:0x233b43,palette:[0x4c606a,0x687b84,0x82929a,0x3f535d,0x9ca8ac]});
   addKenneyCityAssets(city,hashCity(`${state.nation?.name||'nation'}:hero-kenney`),lvl,{radius:5.5});
 
   const rec={renderer,scene,camera,world,host}; heroSceneRecord=rec;
@@ -248,223 +247,107 @@ function initHeroScene(){
   window.addEventListener('resize',heroSceneResize);
 }
 
-// Open-source city-generation basis: adapted from THREEx.ProceduralCity (MIT),
-// modernized for Three.js r180 and made deterministic for Forge a Nation.
-// Source: https://github.com/jeromeetienne/threex.proceduralcity
-
-// Kenney City Kit (CC0) runtime asset integration.
-// Source: https://kenney.nl/assets/city-kit-suburban
-// The browser loads the self-contained GLB models from the public Kenney mirror;
-// procedural massing remains as a graceful fallback if the network is unavailable.
-const KENNEY_BASE='https://raw.githubusercontent.com/shorepine/kenney/main/3d/';
+// Kenney-first city rendering. The old procedural building/tree library is intentionally removed.
+// Runtime source mirror: HidenCod's Kenney model library, which republishes Kenney CC0 GLBs.
+// Original source/licence: https://kenney.nl/assets
+const KENNEY_CATALOG='https://hidencod.github.io/tge-assets/catalog.json';
+const KENNEY_PAGES='https://hidencod.github.io/tge-assets/';
 const kenneyLoader=new GLTFLoader();
 const kenneyCache=new Map();
-const KENNEY_SUBURBAN=['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r'].map(x=>`${KENNEY_BASE}city-suburban/building-type-${x}.glb`);
-const KENNEY_ROAD=`${KENNEY_BASE}city-roads/tile-low.glb`;
+let kenneyCatalogPromise=null;
+
+function getKenneyCatalog(){
+  if(kenneyCatalogPromise)return kenneyCatalogPromise;
+  kenneyCatalogPromise=fetch(KENNEY_CATALOG).then(r=>r.ok?r.json():Promise.reject(new Error('Kenney catalog unavailable'))).catch(()=>({models:[]}));
+  return kenneyCatalogPromise;
+}
+function kenneyEntries(pack,filter){
+  return getKenneyCatalog().then(cat=>{
+    const all=Array.isArray(cat)?cat:(cat.models||cat.assets||[]);
+    return all.filter(x=>{
+      const p=String(x.pack||x.category||x.collection||'');
+      const f=String(x.file||x.path||x.url||'');
+      return (p===pack || p.toLowerCase()===pack.toLowerCase() || f.toLowerCase().includes(pack.toLowerCase().replaceAll(' ','-'))) && (!filter || filter(f,x));
+    });
+  });
+}
+function kenneyUrl(entry){
+  const f=entry.file||entry.path||entry.url;
+  if(!f)return null;
+  if(/^https?:\/\//.test(f))return f;
+  return KENNEY_PAGES+String(f).replace(/^\/+/, '').split('/').map(encodeURIComponent).join('/');
+}
 function loadKenney(url){
+  if(!url)return Promise.reject(new Error('Missing Kenney URL'));
   if(kenneyCache.has(url))return kenneyCache.get(url);
   const promise=new Promise((resolve,reject)=>kenneyLoader.load(url,g=>resolve(g.scene),undefined,reject));
   kenneyCache.set(url,promise); return promise;
 }
-function cloneKenney(src){
-  const x=src.clone(true); x.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}}); return x;
+function cloneKenney(src){const x=src.clone(true);x.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});return x;}
+function seeded(seed){let x=(seed>>>0)||1;return()=>{x=(Math.imul(1664525,x)+1013904223)>>>0;return x/4294967296};}
+function placeSpacedKenney(group,models,rng,count,zone,scaleRange={min:.7,max:1.05},minGap=.8){
+  const placed=[];
+  for(let n=0;n<count;n++){
+    let accepted=null;
+    for(let attempt=0;attempt<90 && !accepted;attempt++){
+      const src=models[Math.floor(rng()*models.length)];
+      const x=zone.x0+rng()*(zone.x1-zone.x0),z=zone.z0+rng()*(zone.z1-zone.z0);
+      const b=cloneKenney(src);const scale=scaleRange.min+rng()*(scaleRange.max-scaleRange.min);b.scale.setScalar(scale);b.rotation.y=Math.floor(rng()*4)*Math.PI/2;
+      const box=new THREE.Box3().setFromObject(b),size=new THREE.Vector3();box.getSize(size);const footprint=Math.max(.25,Math.hypot(size.x,size.z)/2);
+      let clear=true;for(const p of placed){if(Math.hypot(p.x-x,p.z-z)<p.r+footprint+minGap){clear=false;break;}}
+      if(clear){b.position.set(x,.045,z);group.add(b);placed.push({x,z,r:footprint});accepted=true;}
+    }
+  }
+  return placed;
 }
 function addKenneyCityAssets(group,seed,level,opts={}){
-  const rng=(()=>{let x=(seed>>>0)||1;return()=>{x=(Math.imul(1664525,x)+1013904223)>>>0;return x/4294967296}})();
-  const radius=opts.radius||5.4;
-  // Fewer, larger suburban lots at early levels; more lots unlock as the city grows.
-  const count=Math.min(18,6+Math.floor(level*1.35));
-  const urls=KENNEY_SUBURBAN.slice(0,Math.min(10,KENNEY_SUBURBAN.length));
-  Promise.all(urls.map(u=>loadKenney(u))).then(models=>{
+  const rng=seeded(seed),lvl=Math.max(1,Math.min(10,level)),radius=opts.radius||6.4;
+  const city=new THREE.Group();city.name='Kenney City Districts';group.add(city);
+  getKenneyCatalog().then(cat=>{
+    const all=Array.isArray(cat)?cat:(cat.models||cat.assets||[]);
+    const byPack=(pack,fn)=>all.filter(x=>{const p=String(x.pack||x.category||'');const f=String(x.file||x.path||'');return p.toLowerCase()===pack.toLowerCase() && (!fn||fn(f,x));}).map(kenneyUrl).filter(Boolean);
+    const suburban=byPack('City Kit (Suburban)',f=>/building-type-[a-z]\.glb$/i.test(f));
+    const commercial=byPack('City Kit (Commercial)',f=>/building-(?:skyscraper-)?[a-z]\.glb$/i.test(f));
+    const industrial=byPack('City Kit (Industrial)',f=>/building-[a-z]\.glb$/i.test(f));
+    const roads=byPack('City Kit (Roads)',f=>/(road-straight|road-crossroad|road-intersection|road-bend|road-end|road-square|tile-low)\.glb$/i.test(f));
+    const nature=byPack('Nature Kit',f=>/(tree_|tree-|rock_|rock-|plant_|grass|flower_|bush|stone_)/i.test(f));
+    const suburbanUrls=suburban.slice(0,18),commercialUrls=commercial.slice(0,12),industrialUrls=industrial.slice(0,10),roadUrls=roads.slice(0,8),natureUrls=nature.slice(0,24);
+    return Promise.all([
+      Promise.all(suburbanUrls.map(loadKenney)),Promise.all(commercialUrls.map(loadKenney)),Promise.all(industrialUrls.map(loadKenney)),Promise.all(roadUrls.map(loadKenney)),Promise.all(natureUrls.map(loadKenney))
+    ]);
+  }).then(([suburban,commercial,industrial,roads,nature])=>{
     if(!group.parent)return;
-    const assetGroup=new THREE.Group(); assetGroup.name='Kenney City Kit'; group.add(assetGroup);
-
-    // The previous implementation used a fixed center-to-center distance. That is
-    // not sufficient because Kenney models have different footprints. Instead,
-    // measure every actual model footprint after scaling/rotation and reject a
-    // candidate whenever its bounding circle would intersect another house.
-    const placed=[];
-    const coreClearance=3.65;
-    const outerRadius=Math.min(radius,6.0);
-    const candidates=[];
-    // Deterministic perimeter lots: four sides, then corners/intermediate slots.
-    for(let row=0;row<4;row++){
-      const t=(row+.5)/4;
-      const span=outerRadius*2.0;
-      const inset=.65+row*.10;
-      candidates.push(
-        {x:-outerRadius+inset+t*0,z:-outerRadius+inset},
-        {x: outerRadius-inset,z:-outerRadius+inset+t*0},
-        {x:-outerRadius+inset,z: outerRadius-inset},
-        {x: outerRadius-inset,z: outerRadius-inset}
-      );
-    }
-    // Add jittered perimeter candidates so different cities do not look identical.
-    for(let i=0;i<70;i++){
-      const side=Math.floor(rng()*4),t=.08+rng()*.84,j=(rng()-.5)*.34;
-      if(side===0)candidates.push({x:-outerRadius+j,z:(t*2-1)*outerRadius});
-      if(side===1)candidates.push({x: outerRadius+j,z:(t*2-1)*outerRadius});
-      if(side===2)candidates.push({x:(t*2-1)*outerRadius,z:-outerRadius+j});
-      if(side===3)candidates.push({x:(t*2-1)*outerRadius,z: outerRadius+j});
-    }
-
-    let attempts=0;
-    for(const src of models){
-      if(placed.length>=count)break;
-      const repeats=3;
-      for(let rep=0;rep<repeats && placed.length<count;rep++){
-        attempts++;
-        const b=cloneKenney(src);
-        const scale=(0.46+rng()*.13)*(1+level*.012);
-        b.scale.setScalar(scale);
-        b.rotation.y=Math.floor(rng()*4)*Math.PI/2;
-
-        // Compute the real horizontal footprint of this exact Kenney model.
-        const rawBox=new THREE.Box3().setFromObject(b);
-        const rawSize=new THREE.Vector3(); rawBox.getSize(rawSize);
-        const footprint=Math.max(.38,Math.hypot(rawSize.x,rawSize.z)/2);
-        let accepted=false;
-        // Shuffle through deterministic candidates rather than repeatedly guessing
-        // points in already occupied space.
-        for(let cidx=0;cidx<candidates.length && !accepted;cidx++){
-          const c=candidates[(cidx+Math.floor(rng()*candidates.length))%candidates.length];
-          const x=c.x,z=c.z;
-          if(Math.hypot(x,z)<coreClearance+footprint)continue;
-          let clear=true;
-          for(const p of placed){
-            if(Math.hypot(p.x-x,p.z-z)<p.footprint+footprint+.24){clear=false;break;}
-          }
-          if(!clear)continue;
-          b.position.set(x,.045,z);
-          // Recompute after position/rotation; this keeps the collision proxy honest.
-          const worldBox=new THREE.Box3().setFromObject(b);
-          const center=new THREE.Vector3();worldBox.getCenter(center);
-          const worldSize=new THREE.Vector3();worldBox.getSize(worldSize);
-          const actualFootprint=Math.max(.38,Math.hypot(worldSize.x,worldSize.z)/2);
-          if(Math.hypot(center.x,center.z)<coreClearance+actualFootprint)continue;
-          let worldClear=true;
-          for(const p of placed){if(Math.hypot(center.x-p.x,center.z-p.z)<p.footprint+actualFootprint+.24){worldClear=false;break;}}
-          if(!worldClear)continue;
-          b.position.y=.045;
-          assetGroup.add(b);
-          placed.push({x:center.x,z:center.z,footprint:actualFootprint});
-          accepted=true;
-        }
-        if(!accepted)b.traverse(o=>{if(o.isMesh)o.geometry?.dispose?.()});
-      }
-    }
-
-    // Use Kenney road tiles only around the suburban ring. The procedural/core
-    // roads remain separate, preventing road geometry from sitting underneath the
-    // same house lots.
-    loadKenney(KENNEY_ROAD).then(src=>{
-      const roadGroup=new THREE.Group(); roadGroup.name='Kenney Suburban Roads'; assetGroup.add(roadGroup);
-      const roadRadius=outerRadius+.15;
-      for(let i=-2;i<=2;i++){
-        const a=cloneKenney(src);a.position.set(i*2.05,.025,-roadRadius);a.rotation.y=0;a.scale.setScalar(.88);roadGroup.add(a);
-        const b=cloneKenney(src);b.position.set(i*2.05,.026, roadRadius);b.rotation.y=Math.PI; b.scale.setScalar(.88);roadGroup.add(b);
-      }
-      for(let i=-1;i<=1;i++){
-        const a=cloneKenney(src);a.position.set(-roadRadius,.027,i*2.05);a.rotation.y=Math.PI/2;a.scale.setScalar(.88);roadGroup.add(a);
-        const b=cloneKenney(src);b.position.set( roadRadius,.028,i*2.05);b.rotation.y=-Math.PI/2;b.scale.setScalar(.88);roadGroup.add(b);
-      }
-    }).catch(()=>{});
+    const district=new THREE.Group();district.name='Kenney Districts';city.add(district);
+    const coreR=Math.min(2.7+lvl*.32,5.0), worldR=radius;
+    // Roads first: a sparse, readable network with large blocks rather than a wall of buildings.
+    if(roads.length){const rg=new THREE.Group();rg.name='Kenney Roads';district.add(rg);const road=roads[0];const span=worldR*1.55;for(let i=-2;i<=2;i++){const a=cloneKenney(road);a.position.set(i*2.7,.018,-span);a.rotation.y=0;a.scale.setScalar(.92);rg.add(a);const b=cloneKenney(road);b.position.set(i*2.7,.019,span);b.rotation.y=Math.PI;b.scale.setScalar(.92);rg.add(b);}for(let i=-1;i<=1;i++){const a=cloneKenney(road);a.position.set(-span,.019,i*2.7);a.rotation.y=Math.PI/2;a.scale.setScalar(.92);rg.add(a);const b=cloneKenney(road);b.position.set(span,.019,i*2.7);b.rotation.y=-Math.PI/2;b.scale.setScalar(.92);rg.add(b);}}
+    // Residential ring: deliberately sparse and kept outside the core.
+    if(suburban.length){const rg=new THREE.Group();rg.name='Residential';district.add(rg);placeSpacedKenney(rg,suburban,rng,Math.min(14,3+lvl),{x0:-worldR,x1:worldR,z0:-worldR,z1:worldR}, {min:.55,max:.86},.95);}
+    // Commercial core: fewer buildings, larger setbacks, more open plazas.
+    if(commercial.length && lvl>=2){const cg=new THREE.Group();cg.name='Commercial Core';district.add(cg);placeSpacedKenney(cg,commercial,rng,Math.min(7,1+Math.floor(lvl*.65)),{x0:-coreR,x1:coreR,z0:-coreR,z1:coreR},{min:.55,max:.82},1.15);}
+    // Industrial edge: separated from residential districts.
+    if(industrial.length && lvl>=3){const ig=new THREE.Group();ig.name='Industrial District';district.add(ig);placeSpacedKenney(ig,industrial,rng,Math.min(5,1+Math.floor(lvl/2)),{x0:-worldR,x1:-worldR*.48,z0:-worldR*.72,z1:worldR*.72},{min:.52,max:.78},1.2);}
+    // Parks / green corridors: Nature Kit, with real trees/rocks instead of old cones.
+    if(nature.length){const pg=new THREE.Group();pg.name='Parks and Green Corridors';district.add(pg);const parkCount=Math.min(4,1+Math.floor(lvl/3));for(let p=0;p<parkCount;p++){const cx=(p%2?1:-1)*(worldR*.48),cz=(p<2?-1:1)*(worldR*.43);for(let i=0;i<4+lvl;i++){const src=nature[Math.floor(rng()*nature.length)];const t=cloneKenney(src);const s=.28+rng()*.34;t.scale.setScalar(s);t.position.set(cx+(rng()-.5)*2.2,.04,cz+(rng()-.5)*1.7);t.rotation.y=rng()*Math.PI*2;pg.add(t);}}}
+    // A civic plaza is intentionally left empty in the middle.
+    const plaza=new THREE.Mesh(new THREE.CircleGeometry(Math.min(1.05,.45+lvl*.07),32),new THREE.MeshStandardMaterial({color:0x6b8577,roughness:1}));plaza.rotation.x=-Math.PI/2;plaza.position.y=.025;district.add(plaza);
   }).catch(()=>{});
 }
 
-function addProceduralCityDistrict(group,seed,level,opts={}){
-  const rng=(()=>{let x=(seed>>>0)||1;return()=>{x=(Math.imul(1664525,x)+1013904223)>>>0;return x/4294967296}})();
-  const radius=opts.radius||7;
-  const density=opts.density||1;
-  const rows=Math.round((10+level*3)*density);
-  const cols=Math.round((10+level*3)*density);
-  const palette=opts.palette||[0x71828c,0x8f9da4,0x596b76,0xa9b2b5,0x435560];
-  const road=opts.road||0x263941;
-  // Roads first: the original open-source generator is a massing city; this adds a readable street hierarchy.
-  const roadMat=new THREE.MeshStandardMaterial({color:road,roughness:.92});
-  for(let i=-3;i<=3;i++){
-    const r=new THREE.Mesh(new THREE.BoxGeometry(.16,.025,radius*2.1),roadMat); r.position.set(i*1.45,.018,0); group.add(r);
-    const a=new THREE.Mesh(new THREE.BoxGeometry(radius*2.1,.025,.16),roadMat); a.position.set(0,.019,i*1.45); group.add(a);
-  }
-  // Dense deterministic massing, following the THREEx/Mr.doob idea of repeated randomized building blocks.
-  for(let ix=0;ix<cols;ix++) for(let iz=0;iz<rows;iz++){
-    if(rng()<.09) continue;
-    const x=(ix/(cols-1)-.5)*radius*2 + (rng()-.5)*.32;
-    const z=(iz/(rows-1)-.5)*radius*1.55 + (rng()-.5)*.28;
-    const dist=Math.hypot(x,z);
-    if(dist<1.0 && rng()<.75) continue;
-    const urban=(1+level*.11);
-    const towerChance=.05+level*.012;
-    const w=.24+rng()*.5, d=.24+rng()*.5;
-    let h=(.45+rng()*1.4)*urban;
-    if(rng()<towerChance) h*=2.3+level*.08;
-    if(opts.hero) h*=.9;
-    const mat=new THREE.MeshStandardMaterial({color:palette[Math.floor(rng()*palette.length)],roughness:.72,metalness:.08});
-    const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); b.position.set(x,h/2+.035,z); b.rotation.y=(rng()-.5)*.08; group.add(b);
-    // warm window bands; deliberately sparse so the scene remains performant.
-    if(h>.8 && rng()<.48){
-      const wm=new THREE.MeshStandardMaterial({color:0xffc56e,emissive:0x7d4318,emissiveIntensity:.65,roughness:.45});
-      const side=new THREE.Mesh(new THREE.BoxGeometry(.018,Math.min(h*.58,1.7),d*.56),wm);
-      side.position.set(x-w/2-.012,h*.56,z); group.add(side);
-    }
-    if(level>=5 && h>1.8 && rng()<.22){
-      const roof=new THREE.Mesh(new THREE.BoxGeometry(w*.7,.06,d*.7),new THREE.MeshStandardMaterial({color:0xc6d2d7,roughness:.45,metalness:.18}));
-      roof.position.set(x,h+.055,z); group.add(roof);
-    }
-  }
-  // Central landmark grows with national development.
-  if(level>=3){
-    const h=1.4+level*.38;
-    const lm=new THREE.Mesh(new THREE.BoxGeometry(.7,h,.7),new THREE.MeshStandardMaterial({color:0x4fb9c4,metalness:.25,roughness:.35}));
-    lm.position.set(0,h/2+.05,0); group.add(lm);
-    const spire=new THREE.Mesh(new THREE.ConeGeometry(.12,.8,8),new THREE.MeshStandardMaterial({color:0xd8e6ea,metalness:.35,roughness:.3}));
-    spire.position.set(0,h+.45,0); group.add(spire);
-  }
-}
-
-function addCityBuilding(group,x,z,w,h,d,mat,seed,level){
-  const g=new THREE.BoxGeometry(w,h,d);const m=new THREE.MeshStandardMaterial({color:mat,roughness:.82,metalness:.08});const b=new THREE.Mesh(g,m);b.position.set(x,h/2+.05,z);group.add(b);
-  if(level>=4&&h>1.3){const roof=new THREE.Mesh(new THREE.BoxGeometry(w*.72,.08,d*.72),new THREE.MeshStandardMaterial({color:0xd5b85c,roughness:.7}));roof.position.set(x,h+.09,z);group.add(roof)}
-  if(seed%3===0){const side=new THREE.Mesh(new THREE.BoxGeometry(.045,h*.58,d*.76),new THREE.MeshStandardMaterial({color:0x7fd2d7,emissive:0x183c43,emissiveIntensity:.18}));side.position.set(x-w/2-.024,h*.54,z);group.add(side)}
-}
 function buildCityScene(host,c,opts={}){
   if(!host||!c)return null;
   const width=host.clientWidth||640,height=host.clientHeight||320;
-  const scene=new THREE.Scene();
-  const style=cityStyle(c); scene.background=new THREE.Color(style.ground);
-  const camera=new THREE.PerspectiveCamera(32,width/height,.1,100);camera.position.set(8,7,10);camera.lookAt(0,1.4,0);
+  const scene=new THREE.Scene(),style=cityStyle(c);scene.background=new THREE.Color(style.ground);
+  const camera=new THREE.PerspectiveCamera(32,width/height,.1,100);camera.position.set(9.5,7.8,11.5);camera.lookAt(0,1.2,0);
   const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});renderer.setPixelRatio(Math.min(1.5,window.devicePixelRatio||1));renderer.setSize(width,height,false);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;host.appendChild(renderer.domElement);
-  const hemi=new THREE.HemisphereLight(0xaed9e4,0x10252c,1.7);scene.add(hemi);const sun=new THREE.DirectionalLight(0xffe0a4,2.2);sun.position.set(5,10,4);sun.castShadow=true;scene.add(sun);
+  scene.add(new THREE.HemisphereLight(0xb8dce4,0x10252c,1.75));const sun=new THREE.DirectionalLight(0xffe2ad,2.1);sun.position.set(5,10,4);sun.castShadow=true;scene.add(sun);
   const group=new THREE.Group();scene.add(group);
-  const ground=new THREE.Mesh(new THREE.PlaneGeometry(18,14),new THREE.MeshStandardMaterial({color:style.ground,roughness:1}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;group.add(ground);
-  const seed=c.citySeed||citySeed(c),rng=(()=>{let x=seed||1;return()=>{x=(Math.imul(1664525,x)+1013904223)>>>0;return x/4294967296}})();
-  // Use the open-source procedural city approach as the base massing, then layer Forge a Nation progression on top.
-  addProceduralCityDistrict(group,seed,Math.max(1,Math.min(10,c.level||1)),{radius:5.3,density:.72,road:style.road,palette:[style.roof,0x9ab0b6,0xb9c3b7,0x7f9aa6,0xc8a97b]});
-  addKenneyCityAssets(group,seed,Math.max(1,Math.min(10,c.level||1)),{radius:5.1});
-  // road grid expands as the city develops
-  const lvl=Math.max(1,Math.min(10,c.level||1));
-  const roads=3+Math.min(5,Math.floor(lvl/2));
-  const roadMat=new THREE.MeshStandardMaterial({color:style.road,roughness:.95});
-  for(let i=0;i<roads;i++){const x=-5+i*(10/(roads-1));const r=new THREE.Mesh(new THREE.BoxGeometry(.28,.035,12),roadMat);r.position.set(x,.02,0);group.add(r)}
-  for(let i=0;i<roads-1;i++){const z=-5+i*(10/(roads-2));const r=new THREE.Mesh(new THREE.BoxGeometry(11,.035,.28),roadMat);r.position.set(0,.025,z);group.add(r)}
-  // water/river for selected styles
-  if(style.name==='Coastal'||style.name==='River Valley'){
-    const water=new THREE.Mesh(new THREE.PlaneGeometry(18,3.2),new THREE.MeshStandardMaterial({color:0x1f6f82,roughness:.25,metalness:.12}));water.rotation.x=-Math.PI/2;water.position.set(0,.03,5.5);group.add(water);
-    if(style.name==='River Valley'){water.scale.x=.7;water.rotation.z=.15;water.position.set(-3,.03,0)}
-  }
-  // neighborhoods get denser/taller with progression
-  const count=5+lvl*2; const radius=3.8;
-  for(let i=0;i<count;i++){
-    const x=(rng()-.5)*radius*2,z=(rng()-.5)*radius*1.65;const nearRoad=Math.min(Math.abs(x-Math.round(x/1.7)*1.7),Math.abs(z-Math.round(z/1.7)*1.7));
-    const h=(.45+rng()*1.15)*(1+lvl*.12)*(rng()<.12+lvl*.015?1.7:1);const w=.35+rng()*.55,d=.35+rng()*.55;
-    const mat=[style.roof,0x9ab0b6,0xb9c3b7,0x7f9aa6,0xc8a97b][Math.floor(rng()*5)];addCityBuilding(group,x,z,w,h,d,mat,Math.floor(rng()*1000),lvl);
-    if(rng()<.22){const tree=new THREE.Mesh(new THREE.ConeGeometry(.14,.55,6),new THREE.MeshStandardMaterial({color:0x4b9b63}));tree.position.set(x+w*.8,.28,z+d*.8);group.add(tree)}
-  }
-  // signature landmark evolves with level
-  const landmarkH=1.2+lvl*.32;const landmark=new THREE.Mesh(new THREE.BoxGeometry(.7,.18+landmarkH,.7),new THREE.MeshStandardMaterial({color:style.accent,metalness:.18,roughness:.55}));landmark.position.set(0,(.18+landmarkH)/2+.05,0);group.add(landmark);
-  if(lvl>=3){const tower=new THREE.Mesh(new THREE.CylinderGeometry(.18,.28,landmarkH*1.8,8),new THREE.MeshStandardMaterial({color:0xcbd9de,metalness:.35,roughness:.3}));tower.position.set(1.6,landmarkH*.9+.08,-1.2);group.add(tower)}
-  if(lvl>=5){for(let i=0;i<3;i++){const crane=new THREE.Mesh(new THREE.BoxGeometry(.05,1.5,.05),new THREE.MeshStandardMaterial({color:0xd9a84d}));crane.position.set(-3+i*1.2, .75, 2.8);group.add(crane)}}
-  if(lvl>=7){for(let i=0;i<3;i++){const tower=new THREE.Mesh(new THREE.BoxGeometry(.7,2.8+i*.45,.7),new THREE.MeshStandardMaterial({color:0x8fb6c8,metalness:.3,roughness:.35}));tower.position.set(-2+i*2,1.4+i*.22,-2.4);group.add(tower)}}
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(22,18),new THREE.MeshStandardMaterial({color:style.ground,roughness:1}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;group.add(ground);
+  const lvl=Math.max(1,Math.min(10,c.level||1)),seed=c.citySeed||citySeed(c);
+  addKenneyCityAssets(group,seed,lvl,{radius:6.4});
+  // Sparse civic progression that does not use the retired placeholder building/tree library.
+  if(lvl>=4){const landmark=new THREE.Mesh(new THREE.BoxGeometry(.65,1.4+lvl*.18,.65),new THREE.MeshStandardMaterial({color:style.accent,metalness:.2,roughness:.45}));landmark.position.set(0,.75+lvl*.09,0);group.add(landmark);}
+  if(lvl>=6){const tower=new THREE.Mesh(new THREE.CylinderGeometry(.14,.24,2.4+lvl*.25,10),new THREE.MeshStandardMaterial({color:0xcbd9de,metalness:.35,roughness:.3}));tower.position.set(1.9,1.25+lvl*.13,-1.8);group.add(tower);}
   let dragging=false,lastX=0,lastY=0;renderer.domElement.style.touchAction='none';renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;renderer.domElement.setPointerCapture?.(e.pointerId)});renderer.domElement.addEventListener('pointerup',e=>{dragging=false;renderer.domElement.releasePointerCapture?.(e.pointerId)});renderer.domElement.addEventListener('pointercancel',()=>dragging=false);renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;group.rotation.y+=(e.clientX-lastX)*.008;group.rotation.x=THREE.MathUtils.clamp(group.rotation.x+(e.clientY-lastY)*.004,-.35,.25);lastX=e.clientX;lastY=e.clientY});
   const rec={renderer,scene,camera,group,host};citySceneRecords.push(rec);return rec;
 }

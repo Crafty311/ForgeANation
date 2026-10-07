@@ -1,22 +1,30 @@
-# Forge a Nation V7.11
+# Forge a Nation V7.12 — Kenney City Overhaul
 
-## City rendering provenance
-The 3D city massing uses a modernized, deterministic adaptation of the MIT-licensed THREEx.ProceduralCity approach by Jerome Etienne, originally based on mrdoob's Three.js city demo.
+## City rendering
+The old placeholder/procedural building and tree library has been removed from the active city renderer.
 
-Source: https://github.com/jeromeetienne/threex.proceduralcity
-License: MIT
+Cities now use a district-based Kenney-first layout:
+- City Kit (Suburban): sparse residential neighborhoods
+- City Kit (Commercial): compact downtown/commercial core
+- City Kit (Industrial): separated industrial edge
+- City Kit (Roads): readable road network
+- Nature Kit: parks, trees, rocks and green corridors
 
-The implementation has been adapted for modern Three.js and Forge a Nation's progression system; no proprietary ThreeUI assets are included.
+The renderer deliberately leaves substantial open land and plaza space. Density increases with city progression instead of filling the entire map at every level.
 
-Kenney also provides CC0 City Kit assets (Suburban, Industrial, Roads, etc.) that are suitable for future modular asset expansion:
+Models are loaded at runtime from HidenCod's public Kenney CC0 model library, which documents the packs as Kenney assets under CC0:
+https://github.com/Hidencod/tge-assets
+
+Official Kenney sources:
 https://kenney.nl/assets/city-kit-suburban
+https://kenney.nl/assets/city-kit-commercial
 https://kenney.nl/assets/city-kit-industrial
+https://kenney.nl/assets/city-kit-roads
+https://kenney.nl/assets/nature-kit
+https://kenney.nl/assets/building-kit
+https://kenney.nl/assets/retro-urban-kit
 
+## Important
+Building Kit and Retro Urban Kit are documented in the README as candidate future district packs, but they are not falsely claimed as runtime-integrated in this build because the public runtime catalog used here does not expose those two packs. The active renderer only loads assets that can be resolved from the runtime catalog.
 
-## Kenney City Kit integration
-The city renderer now uses real Kenney City Kit GLB assets at runtime, including City Kit (Suburban) building models and City Kit (Roads) tiles. Kenney publishes these packs under CC0, so they can be used in personal or commercial projects. The game keeps its procedural city layer as a fallback and for progression/landmark dressing.
-
-Official sources:
-- https://kenney.nl/assets/city-kit-suburban
-- https://kenney.nl/assets/city-kit-roads
-- https://kenney.nl/support
+No proprietary ThreeUI assets are included.
