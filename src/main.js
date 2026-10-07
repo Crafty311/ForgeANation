@@ -278,11 +278,25 @@ function addKenneyCityAssets(group,seed,level,opts={}){
   Promise.all(urls.map(u=>loadKenney(u))).then(models=>{
     if(!group.parent)return;
     const assetGroup=new THREE.Group(); assetGroup.name='Kenney City Kit'; group.add(assetGroup);
-    for(let i=0;i<count;i++){
+    // Keep Kenney suburban houses in a dedicated outer residential ring.
+    // The procedural city owns the inner/core district, so the two systems never
+    // spawn on top of one another. A small spacing test also prevents Kenney
+    // houses from intersecting each other.
+    const placed=[];
+    const minGap=1.18;
+    const innerRadius=3.45;
+    let attempts=0;
+    while(placed.length<count && attempts<220){
+      attempts++;
+      const a=rng()*Math.PI*2;
+      const r=innerRadius + rng()*Math.max(.8,radius-innerRadius);
+      const x=Math.cos(a)*r;
+      const z=Math.sin(a)*r*.78;
+      if(placed.some(p=>Math.hypot(p.x-x,p.z-z)<minGap)) continue;
+      placed.push({x,z});
       const src=models[Math.floor(rng()*models.length)];
       const b=cloneKenney(src);
-      const x=(rng()-.5)*radius*1.8, z=(rng()-.5)*radius*1.45;
-      const scale=(0.72+rng()*.34)*(1+level*.035);
+      const scale=(0.68+rng()*.24)*(1+level*.025);
       b.position.set(x,.045,z); b.rotation.y=Math.round(rng()*3)*Math.PI/2; b.scale.setScalar(scale);
       assetGroup.add(b);
     }
