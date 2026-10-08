@@ -336,7 +336,7 @@ function upgradeSkill(id){const n=state.nation,c=skillCost(id),d=skillDefs.find(
 function buyAsset(id){const n=state.nation,d=storeDefs.find(x=>x.id===id);if(!d)return;if(level().level<d.req)return toast(`Reach Level ${d.req} to unlock this.`);if(!Number.isFinite(d.cost)||d.cost<0)return toast('This purchase cost could not be calculated.');if(n.money<d.cost)return toast('Not enough national wealth.');n.money=Math.max(0,Math.round(n.money-d.cost));n.assets[id]=(n.assets[id]||0)+1;n.xp+=Math.round(d.cost/20000);if(id==='stadium')n.happiness=Math.min(100,n.happiness+3);if(id==='hospital')n.happiness=Math.min(100,n.happiness+4);if(id==='finance')n.reputation+=4;n.history.unshift(`${d.name} was built in ${n.name}.`);save();toast(`${d.name} built`);renderGame();}
 function upgradeCity(){const n=state.nation,c=selectedCity(),cost=Math.round(1800000*Math.pow(1.48,Math.max(0,(c.level||1)-1)));if(!Number.isFinite(cost)||cost<0)return toast('This city upgrade cost could not be calculated.');if(n.money<cost)return toast('Not enough wealth to upgrade this city.');n.money=Math.max(0,Math.round(n.money-cost));c.level=(c.level||1)+1;c.pop=Math.round(c.pop*1.10);c.income=(c.income||0)+420000;c.happiness=Math.min(100,(c.happiness||65)+1);n.cityLevel=Math.max(n.cityLevel||1,c.level);n.happiness=Math.min(100,n.happiness+1);n.xp+=Math.round(cost/18000);n.history.unshift(`${c.name} reached City Level ${c.level}.`);ensureCityVariants(n);save();toast(`${c.name} grew into a larger city`);renderGame();}
 function buildCost(def,c){return Math.round(def.cost*Math.pow(1.14,(c.buildings||[]).filter(x=>x.id===def.id).length));}
-const LOTS=[[-2.85,-2.85],[-1.15,-2.85],[-2.85,-1.15],[-1.15,-1.15],[1.15,-2.85],[2.85,-2.85],[1.15,-1.15],[2.85,-1.15],[-2.85,1.15],[-1.15,1.15],[-2.85,2.85],[-1.15,2.85],[1.15,1.15],[2.85,1.15],[1.15,2.85],[2.85,2.85]];
+const LOTS=[[-7.43,-7.43],[-2.70,-7.43],[2.70,-7.43],[7.43,-7.43],[-7.43,-2.70],[-2.70,-2.70],[2.70,-2.70],[7.43,-2.70],[-7.43,2.70],[-2.70,2.70],[2.70,2.70],[7.43,2.70],[-7.43,7.43],[-2.70,7.43],[2.70,7.43],[7.43,7.43]];
 function buildInCity(id){const n=state.nation,c=selectedCity(),def=BUILD_DEFS.find(x=>x.id===id);if(!def)return;const cost=buildCost(def,c);if(!Number.isFinite(cost)||cost<0)return toast('This building cost could not be calculated.');if(n.money<cost)return toast(`You need ${money(cost)} for ${def.name}.`);if((c.level||1)<(def.cat==='Civic'&&id==='university'?4:def.cat==='Infrastructure'?2:1))return toast('Grow the city further to unlock this.');const used=new Set((c.buildings||[]).map(x=>x.slot));const slot=LOTS.findIndex((_,i)=>!used.has(i));if(slot<0)return toast('All planned lots are occupied. Upgrade the city to unlock more land.');n.money=Math.max(0,Math.round(n.money-cost));c.buildings=c.buildings||[];c.buildings.push({id,slot,level:1});c.income=(c.income||0)+(def.income||0);c.happiness=clamp((c.happiness||65)+(def.happy||0),0,100);c.pop=Math.round((c.pop||0)+(def.pop||0)*.1);n.xp+=Math.round(cost/18000)+35;if(def.cat==='Nature')c.zones.park++;if(def.cat==='Residential')c.zones.residential++;if(def.cat==='Commercial')c.zones.commercial++;if(def.cat==='Industrial')c.zones.industrial++;n.history.unshift(`${def.name} was built in ${c.name}.`);save();toast(`${def.icon} ${def.name} opened in ${c.name}`);renderGame();}
 function addRoadToCity(){const n=state.nation,c=selectedCity(),cost=Math.round(260000*Math.pow(1.12,Math.max(0,c.roads||2)-2));if(n.money<cost)return toast(`You need ${money(cost)} for a new road.`);if((c.roads||2)>=10+(c.level||1)*2)return toast('The current road network is already extensive.');n.money-=cost;c.roads=(c.roads||2)+1;c.income=(c.income||0)+18000;c.happiness=clamp((c.happiness||65)+.25,0,100);n.xp+=45;n.history.unshift(`A new road opened in ${c.name}.`);save();toast('🛣️ Road extended');renderGame();}
 function zoneCity(id){const c=selectedCity();c.zones=c.zones||{};c.zones[id]=(c.zones[id]||0)+1;c.happiness=clamp((c.happiness||65)+(id==='park'?1:.15),0,100);save();toast(`${ZONE_DEFS.find(z=>z.id===id)?.icon||'◈'} ${ZONE_DEFS.find(z=>z.id===id)?.name||id} land reserved`);renderGame();}
@@ -739,139 +739,160 @@ function addCozyProjectVisuals(group,c){
   // data is represented by the real Kenney buildings and decorations below.
 }
 
-const CITY_ROADS=[-8,-4,0,4,8];
-const CITY_BLOCKS=[];
-for(let xi=0;xi<CITY_ROADS.length-1;xi++){
-  for(let zi=0;zi<CITY_ROADS.length-1;zi++){
-    const x0=CITY_ROADS[xi]+.45,x1=CITY_ROADS[xi+1]-.45;
-    const z0=CITY_ROADS[zi]+.45,z1=CITY_ROADS[zi+1]-.45;
-    CITY_BLOCKS.push({xi,zi,x0,x1,z0,z1,cx:(x0+x1)/2,cz:(z0+z1)/2});
-  }
-}
-const PLAYER_LOTS=LOTS.map(([x,z])=>({x,z}));
+/* -------------------------------------------------------------------------
+   Hay-Day-style city renderer
+   - fixed isometric camera
+   - deterministic tile map
+   - roads/path tiles on a strict grid
+   - every building/decorative item lives inside a block
+   - characters follow actual path lanes and are updated by the main city loop
+   ------------------------------------------------------------------------- */
+const HAY_GRID=13;
+const HAY_TILE=1.35;
+const HAY_CENTER=(HAY_GRID-1)/2;
+const HAY_ROADS=[2,6,10];
+const HAY_WORLD_MIN=0;
+const HAY_WORLD_MAX=HAY_GRID-1;
+const HAY_BLOCK_RANGES=[[0,1],[3,5],[7,9],[11,12]];
 
-function fitKenney(model,maxXZ,maxY=3.25){
-  const box=new THREE.Box3().setFromObject(model);
-  const size=new THREE.Vector3();box.getSize(size);
-  const horizontal=Math.max(size.x,size.z,.001);
-  const height=Math.max(size.y,.001);
-  const scale=Math.min(maxXZ/horizontal,maxY/height);
-  model.scale.setScalar(scale);
-  return {width:size.x*scale,depth:size.z*scale,height:size.y*scale,radius:Math.max(size.x,size.z)*scale*.5};
+function hayWorld(i){return (i-HAY_CENTER)*HAY_TILE;}
+function hayBlock(indexX,indexZ){
+  const xr=HAY_BLOCK_RANGES[indexX],zr=HAY_BLOCK_RANGES[indexZ];
+  const cx=hayWorld((xr[0]+xr[1])/2),cz=hayWorld((zr[0]+zr[1])/2);
+  return {ix:indexX,iz:indexZ,x0:hayWorld(xr[0])-.57,x1:hayWorld(xr[1])+.57,z0:hayWorld(zr[0])-.57,z1:hayWorld(zr[1])+.57,cx,cz};
 }
+const HAY_BLOCKS=[];
+for(let ix=0;ix<4;ix++)for(let iz=0;iz<4;iz++)HAY_BLOCKS.push(hayBlock(ix,iz));
+const HAY_PLAYER_LOTS=LOTS.map(([x,z],i)=>({x,z,index:i,ix:i%4,iz:Math.floor(i/4)}));
 
 function updateCityAgents(root,dt){
-  if(!root)return;
+  if(!root||!Number.isFinite(dt)||dt<=0)return;
   root.traverse(o=>{
     const a=o.userData?.cityAgent;
     if(!a)return;
+    a.t=(a.t||0)+dt;
     const step=a.speed*dt*a.dir;
-    if(a.axis==='x') o.position.x+=step; else o.position.z+=step;
+    if(a.axis==='x')o.position.x+=step;else o.position.z+=step;
     const coord=o.position[a.axis];
     if(coord>=a.max || coord<=a.min){
-      a.dir*=-1;
+      a.dir=coord>=a.max?-1:1;
       o.position[a.axis]=THREE.MathUtils.clamp(coord,a.min,a.max);
-      o.rotation.y=a.axis==='x'?(a.dir>0?0:Math.PI):(a.dir>0?Math.PI/2:-Math.PI/2);
     }
+    o.rotation.y=a.axis==='x'?(a.dir>0?0:Math.PI):(a.dir>0?Math.PI/2:-Math.PI/2);
     a.distance=(a.distance||0)+Math.abs(step);
-    // Small bob gives the static Kenney characters a visibly animated walk
-    // even though the bundled models themselves are static meshes.
-    o.position.y=a.baseY+Math.sin(a.distance*10)*.018;
+    o.position.y=a.baseY + Math.sin(a.distance*8.5)*.018;
+    o.rotation.z=Math.sin(a.distance*7.2)*.025;
   });
 }
 
-function addCityRoadNetwork(parent,roads){
-  const roadGroup=new THREE.Group();roadGroup.name='Roads';parent.add(roadGroup);
+function makeHayTile(material,x,z,y=.01,h=.07){
+  const tile=new THREE.Mesh(new THREE.BoxGeometry(HAY_TILE*.985,HAY_TILE*.22,HAY_TILE*.985),material.clone());
+  tile.position.set(x,y,z);tile.receiveShadow=true;tile.castShadow=false;return tile;
+}
+
+function addHayGround(parent,style){
+  const g=new THREE.Group();g.name='Hay Day Ground';parent.add(g);
+  const baseMat=new THREE.MeshStandardMaterial({color:new THREE.Color(style.ground).offsetHSL(.015,.03,.05),roughness:1});
+  const altMat=new THREE.MeshStandardMaterial({color:new THREE.Color(style.ground).offsetHSL(.012,.025,.028),roughness:1});
+  for(let iz=0;iz<HAY_GRID;iz++)for(let ix=0;ix<HAY_GRID;ix++)g.add(makeHayTile((ix+iz)%2?altMat:baseMat,hayWorld(ix),hayWorld(iz),-.02,.1));
+
+  const blockMat=new THREE.MeshStandardMaterial({color:new THREE.Color(style.ground).offsetHSL(.02,.02,.09),roughness:1});
+  const plotMat=new THREE.MeshStandardMaterial({color:new THREE.Color(style.ground).offsetHSL(.025,.02,.12),roughness:1});
+  HAY_BLOCKS.forEach((b,idx)=>{
+    const bw=b.x1-b.x0,bz=b.z1-b.z0;
+    const slab=new THREE.Mesh(new THREE.BoxGeometry(bw-.08,.065,bz-.08),blockMat.clone());
+    slab.position.set(b.cx,.075,b.cz);slab.receiveShadow=true;g.add(slab);
+    // A smaller raised plot gives the city the tidy, hand-placed mobile-builder look.
+    const inset=.28;
+    const plot=new THREE.Mesh(new THREE.BoxGeometry(Math.max(.6,bw-inset),.045,Math.max(.6,bz-inset)),plotMat.clone());
+    plot.position.set(b.cx,.112,b.cz);plot.receiveShadow=true;g.add(plot);
+  });
+  return g;
+}
+
+function addHayRoads(parent,roads){
+  const g=new THREE.Group();g.name='Hay Day Paths';parent.add(g);
   const straight=roads[0],intersection=roads[2]||roads[0];
-  // Preserve the orientation corrected in the previous approved update.
-  for(const z of CITY_ROADS){
-    for(const x=-8;x<=8;x+=1){
-      if(CITY_ROADS.includes(x))continue;
-      const r=cloneKenney(straight);r.scale.setScalar(1);r.position.set(x,.025,z);r.rotation.y=Math.PI/2;roadGroup.add(r);
+  const mid=HAY_TILE;
+  // Keep the orientation established in the approved road-rotation update.
+  for(const row of HAY_ROADS){
+    const z=hayWorld(row);
+    for(let i=0;i<HAY_GRID;i++)if(!HAY_ROADS.includes(i)){
+      const r=cloneKenney(straight);r.scale.setScalar(mid);r.position.set(hayWorld(i),.14,z);r.rotation.y=Math.PI/2;g.add(r);
     }
   }
-  for(const x of CITY_ROADS){
-    for(const z=-8;z<=8;z+=1){
-      if(CITY_ROADS.includes(z))continue;
-      const r=cloneKenney(straight);r.scale.setScalar(1);r.position.set(x,.026,z);r.rotation.y=0;roadGroup.add(r);
+  for(const col of HAY_ROADS){
+    const x=hayWorld(col);
+    for(let i=0;i<HAY_GRID;i++)if(!HAY_ROADS.includes(i)){
+      const r=cloneKenney(straight);r.scale.setScalar(mid);r.position.set(x,.141,hayWorld(i));r.rotation.y=0;g.add(r);
     }
   }
-  for(const x of CITY_ROADS)for(const z of CITY_ROADS){
-    const j=cloneKenney(intersection);j.scale.setScalar(1);j.position.set(x,.03,z);roadGroup.add(j);
+  for(const x of HAY_ROADS)for(const z of HAY_ROADS){
+    const j=cloneKenney(intersection);j.scale.setScalar(mid);j.position.set(hayWorld(x),.145,hayWorld(z));j.rotation.y=0;g.add(j);
   }
-  return roadGroup;
+  return g;
 }
 
-function addCityBlockGrounds(parent,style){
-  const g=new THREE.Group();g.name='City Blocks';parent.add(g);
-  const mat=new THREE.MeshStandardMaterial({color:new THREE.Color(style.ground).offsetHSL(.02,.02,.045),roughness:1});
-  for(const b of CITY_BLOCKS){
-    const w=b.x1-b.x0,d=b.z1-b.z0;
-    const tile=new THREE.Mesh(new THREE.PlaneGeometry(w,d),mat.clone());
-    tile.rotation.x=-Math.PI/2;tile.position.set(b.cx,.008,b.cz);tile.receiveShadow=true;g.add(tile);
-  }
+function hayBlockOccupied(c,b){return (c?.buildings||[]).some(item=>{
+  const lot=HAY_PLAYER_LOTS[item.slot%HAY_PLAYER_LOTS.length];
+  return lot && lot.ix===b.ix && lot.iz===b.iz;
+});}
+function hayTryPlace(occupied,block,x,z,r){
+  const within=x>=block.x0+r && x<=block.x1-r && z>=block.z0+r && z<=block.z1-r;
+  if(!within)return false;
+  for(const o of occupied)if(Math.hypot(o.x-x,o.z-z)<o.r+r+.12)return false;
+  occupied.push({x,z,r});return true;
 }
 
-function blockIsPlayer(b){return b.xi>=1&&b.xi<=2&&b.zi>=1&&b.zi<=2;}
-function lotClear(occupied,x,z,r=.7){return occupied.every(p=>Math.hypot(p.x-x,p.z-z)>p.r+r+.08);}
+function addHayBackground(parent,groups,nature,rng,lvl,city){
+  const [residential,commercial,industrial,towers]=groups;
+  const arch=new THREE.Group();arch.name='Established Buildings';parent.add(arch);
+  const decor=new THREE.Group();decor.name='Trees And Greenery';parent.add(decor);
+  const occupied=[];
+  HAY_PLAYER_LOTS.forEach(p=>{if((city?.buildings||[]).some(b=>b.slot===p.index))occupied.push({x:p.x,z:p.z,r:.94});});
 
-function addBackgroundCity(parent,models,trees,rng,lvl,c){
-  const root=new THREE.Group();root.name='Established Neighborhoods';parent.add(root);
-  const occupied=PLAYER_LOTS.map(p=>({x:p.x,z:p.z,r:.65}));
-  const buildingAnchors=[
-    [-.78,-.78],[.78,-.78],[-.78,.78],[.78,.78]
-  ];
-  const blocks=CITY_BLOCKS.slice().sort((a,b)=>a.xi-b.xi||a.zi-b.zi);
-  for(const b of blocks){
-    const playerBlock=blockIsPlayer(b);
-    const [residential,commercial,industrial,towers]=models;
-    const role=playerBlock?'none':(Math.abs(b.cx)>=6?'industrial':(Math.abs(b.cz)>=6?'commercial':'residential'));
-    let pool=role==='industrial'?industrial:role==='commercial'?commercial:residential;
-    if(role==='residential' && lvl>=5 && rng()<.28 && towers?.length)pool=towers;
-    if(!pool?.length)continue;
-    const count=playerBlock?0:Math.min(3,1+Math.floor((lvl-1)/3));
-    const anchors=buildingAnchors.slice().sort(()=>rng()-.5);
-    for(let i=0;i<count;i++){
-      let chosen=null;
-      for(const [ax,az] of anchors){
-        const x=b.cx+ax,z=b.cz+az;
-        if(lotClear(occupied,x,z,.52)){chosen={x,z};break;}
-      }
-      if(!chosen)continue;
-      const src=pool[Math.floor(rng()*pool.length)];
-      const g=cloneKenney(src);fitKenney(g,role==='industrial'?1.05:.98,role==='industrial'?2.35:2.6);
-      g.position.set(chosen.x,.035,chosen.z);g.rotation.y=Math.floor(rng()*4)*Math.PI/2;root.add(g);
-      occupied.push({x:chosen.x,z:chosen.z,r:.52});
-    }
-  }
-
-  // Trees and small green clusters live in the gaps around buildings, never on a road.
-  const green=new THREE.Group();green.name='Trees & Greenery';parent.add(green);
-  const treeCandidates=[[-.98,-.98],[0,-1.05],[.98,-.98],[-1.05,0],[0,0],[1.05,0],[-.98,.98],[0,1.05],[.98,.98]];
-  CITY_BLOCKS.forEach(b=>{
-    const playerBlock=blockIsPlayer(b);
-    const wanted=playerBlock?2:Math.min(5,2+Math.floor(lvl/2));
-    const shuffled=treeCandidates.slice().sort(()=>rng()-.5);
+  HAY_BLOCKS.forEach((b,idx)=>{
+    const playerBlock=hayBlockOccupied(city,b);
+    const edge=b.ix===0||b.ix===3||b.iz===0||b.iz===3;
+    const pool=(edge&&industrial.length&&rng()<.28)?industrial:(commercial.length&&rng()<.32?commercial:residential);
+    const count=playerBlock?Math.max(0,1-Math.floor(lvl/7)):Math.min(2,1+Math.floor((lvl-1)/5));
+    const anchors=[[-.72,-.72],[.72,-.72],[-.72,.72],[.72,.72],[0,0]].map(([x,z])=>({x:b.cx+x,z:b.cz+z})).sort(()=>rng()-.5);
     let placed=0;
-    for(const [ax,az] of shuffled){
-      if(placed>=wanted)break;
-      const x=b.cx+ax*.72,z=b.cz+az*.72;
-      if(!lotClear(occupied,x,z,.42))continue;
-      const model=trees[Math.floor(rng()*trees.length)];
-      const tree=cloneKenney(model);fitKenney(tree,.82,1.7);
-      tree.scale.multiplyScalar(.74+rng()*.18);
-      tree.position.set(x,.03,z);tree.rotation.y=rng()*Math.PI*2;green.add(tree);
-      occupied.push({x,z,r:.42});placed++;
+    for(const a of anchors){
+      if(placed>=count||!pool?.length)break;
+      const src=pool[Math.floor(rng()*pool.length)];
+      const g=cloneKenney(src);
+      const maxXZ=edge?1.45:1.75;
+      fitKenney(g,maxXZ,2.55);
+      const r=hayTryPlace(occupied,b,a.x,a.z,Math.min(.78,maxXZ*.42));
+      if(!r)continue;
+      g.position.set(a.x,.16,a.z);g.rotation.y=Math.floor(rng()*4)*Math.PI/2;g.castShadow=true;arch.add(g);placed++;
+    }
+
+    const treeSpots=[[-.86,-.86],[.86,-.86],[-.86,.86],[.86,.86],[0,-.92],[.92,0],[-.92,0],[0,.92]].sort(()=>rng()-.5);
+    const treeCount=playerBlock?2:Math.min(3,1+Math.floor(lvl/3));
+    let planted=0;
+    for(const t of treeSpots){
+      if(planted>=treeCount)break;
+      const x=b.cx+t[0],z=b.cz+t[1];
+      if(!hayTryPlace(occupied,b,x,z,.38))continue;
+      const src=nature[Math.floor(rng()*nature.length)],tree=cloneKenney(src);
+      fitKenney(tree,.85,1.85);tree.scale.multiplyScalar(.72+rng()*.18);tree.position.set(x,.16,z);tree.rotation.y=rng()*Math.PI*2;tree.castShadow=true;decor.add(tree);planted++;
     }
   });
+
+  // A small central plaza sells the mobile-builder presentation without adding another gameplay system.
+  const plazaMat=new THREE.MeshStandardMaterial({color:0xc8a86a,roughness:.95});
+  const plaza=new THREE.Mesh(new THREE.CylinderGeometry(1.05,1.18,.08,24),plazaMat);plaza.position.set(0,.18,0);plaza.receiveShadow=true;decor.add(plaza);
+  const plazaTree=nature[Math.floor(rng()*nature.length)];
+  if(plazaTree){const tree=cloneKenney(plazaTree);fitKenney(tree,.75,1.65);tree.position.set(0,.22,0);tree.castShadow=true;decor.add(tree);}
 }
 
-function addPlayerBuildings(parent,c){
+function addHayPlayerBuildings(parent,c){
   const buildings=c.buildings||[];if(!buildings.length)return;
   const root=new THREE.Group();root.name='Player Buildings';parent.add(root);
   const map={
-    cottage:LOCAL_ASSETS.residential,
-    apartment:LOCAL_ASSETS.residential,
+    cottage:LOCAL_ASSETS.residential,apartment:LOCAL_ASSETS.residential,
     shop:LOCAL_ASSETS.commercial,cafe:LOCAL_ASSETS.commercial,market:LOCAL_ASSETS.commercial,
     school:LOCAL_ASSETS.commercial,clinic:LOCAL_ASSETS.commercial,museum:LOCAL_ASSETS.commercial,
     workshop:LOCAL_ASSETS.industrial,warehouse:LOCAL_ASSETS.industrial,
@@ -881,95 +902,90 @@ function addPlayerBuildings(parent,c){
   loadAssetSet(urls).then(()=>{
     buildings.forEach((b,idx)=>{
       const def=BUILD_DEFS.find(x=>x.id===b.id),pool=map[b.id];if(!def||!pool?.length)return;
-      const url=pool[(b.slot+idx)%pool.length],src=kenneyCache.get(url);if(!src)return;
-      const lot=LOTS[b.slot%LOTS.length];
+      const lot=HAY_PLAYER_LOTS[b.slot%HAY_PLAYER_LOTS.length],src=kenneyCache.get(pool[(b.slot+idx)%pool.length]);if(!lot||!src)return;
       const g=cloneKenney(src);
-      const target=b.id==='stadium'?1.16:b.id==='university'?1.08:b.id==='workshop'||b.id==='warehouse'?1.02:.96;
-      fitKenney(g,Math.min(target,.96),b.id==='university'?2.75:2.55);
-      g.position.set(lot[0],.036,lot[1]);
-      g.rotation.y=(idx%4)*Math.PI/2;
-      g.userData.buildingId=b.id;
-      root.add(g);
+      const maxXZ=b.id==='stadium'?1.82:b.id==='university'?1.75:(b.id==='workshop'||b.id==='warehouse'?1.68:1.62);
+      fitKenney(g,maxXZ,b.id==='university'?2.9:2.65);
+      g.position.set(lot.x,.17,lot.z);g.rotation.y=(idx%4)*Math.PI/2;g.userData.buildingId=b.id;g.castShadow=true;root.add(g);
     });
   }).catch(err=>console.warn('Player building assets failed to load',err));
 }
 
-function addCityCitizens(parent,population,rng,citizenModels){
-  const people=new THREE.Group();people.name='Citizens';parent.add(people);
-  const count=Math.max(4,Math.min(18,Math.round(Math.sqrt(Math.max(1,population||0)/90000))));
+function addHayCitizens(parent,population,rng,models){
+  const root=new THREE.Group();root.name='Citizens On Paths';parent.add(root);
+  const count=Math.max(5,Math.min(24,Math.round(6+Math.sqrt(Math.max(1,population||0)/70000))));
   for(let i=0;i<count;i++){
-    const p=cloneKenney(citizenModels[Math.floor(rng()*citizenModels.length)]);
-    fitKenney(p,.28,.62);
-    const horizontal=rng()<.52;
-    const line=CITY_ROADS[Math.floor(rng()*CITY_ROADS.length)];
-    const min=-7.65,max=7.65;
+    const p=cloneKenney(models[Math.floor(rng()*models.length)]);
+    fitKenney(p,.34,.72);
+    const horizontal=rng()<.5;
+    const lane=HAY_ROADS[Math.floor(rng()*HAY_ROADS.length)];
+    const laneWorld=hayWorld(lane);
+    const min=hayWorld(0)+HAY_TILE*.16,max=hayWorld(HAY_GRID-1)-HAY_TILE*.16;
     const start=min+rng()*(max-min);
-    p.position.set(horizontal?start:line,.055,horizontal?line:start);
+    p.position.set(horizontal?start:laneWorld,.22,horizontal?laneWorld:start);
     p.rotation.y=horizontal?(rng()<.5?0:Math.PI):(rng()<.5?Math.PI/2:-Math.PI/2);
-    p.userData.cityAgent={axis:horizontal?'x':'z',dir:rng()<.5?-1:1,min,max,speed:.42+rng()*.28,distance:rng()*3,baseY:.055};
-    people.add(p);
+    p.userData.cityAgent={axis:horizontal?'x':'z',dir:rng()<.5?-1:1,min,max,speed:.62+rng()*.35,baseY:.22,distance:rng()*8,t:rng()*4};
+    p.castShadow=true;root.add(p);
   }
-  return people;
+  // A tiny queue of path walkers feels much livelier than a single hero in the center.
+  return root;
 }
 
 function addHayDayCityAssets(parent,seed,level,opts={}){
   const rng=seeded(seed),lvl=Math.max(1,Math.min(10,level||1));
-  const city=new THREE.Group();city.name='Isometric Hay Day City';parent.add(city);
-  if(opts.footprintScale)city.scale.setScalar(opts.footprintScale);
+  const city=new THREE.Group();city.name='Forge Hay Day City';parent.add(city);
   Promise.all([
-    loadAssetSet(LOCAL_ASSETS.residential),
-    loadAssetSet(LOCAL_ASSETS.commercial),
-    loadAssetSet(LOCAL_ASSETS.industrial),
-    loadAssetSet(LOCAL_ASSETS.towers),
-    loadAssetSet(LOCAL_ASSETS.roads),
-    loadAssetSet(LOCAL_ASSETS.nature),
-    loadAssetSet(LOCAL_ASSETS.citizens)
+    loadAssetSet(LOCAL_ASSETS.residential),loadAssetSet(LOCAL_ASSETS.commercial),loadAssetSet(LOCAL_ASSETS.industrial),
+    loadAssetSet(LOCAL_ASSETS.towers),loadAssetSet(LOCAL_ASSETS.roads),loadAssetSet(LOCAL_ASSETS.nature),loadAssetSet(LOCAL_ASSETS.citizens)
   ]).then(([residential,commercial,industrial,towers,roads,nature,citizens])=>{
     const style=opts.style||CITY_STYLES[(seed>>>0)%CITY_STYLES.length];
     const world=new THREE.Group();world.name='City World';city.add(world);
-    addCityBlockGrounds(world,style);
-    addCityRoadNetwork(world,roads);
-    addBackgroundCity(world,[residential,commercial,industrial,towers],nature,rng,lvl,opts.city||null);
-    if(opts.city)addPlayerBuildings(world,opts.city);
-    if((opts.population||0)>0)addCityCitizens(world,opts.population,rng,citizens);
+    addHayGround(world,style);
+    addHayRoads(world,roads);
+    addHayBackground(world,[residential,commercial,industrial,towers],nature,rng,lvl,opts.city||null);
+    if(opts.city)addHayPlayerBuildings(world,opts.city);
+    if((opts.population||0)>0)addHayCitizens(world,opts.population,rng,citizens);
   }).catch(err=>console.warn('Hay Day city assets failed to load',err));
   return city;
 }
 
 function buildCityScene(host,c,opts={}){
   if(!host||!c)return null;
-  const width=host.clientWidth||640,height=host.clientHeight||320;
+  const width=host.clientWidth||720,height=host.clientHeight||430;
   const style=cityStyle(c);
-  const scene=new THREE.Scene();scene.background=new THREE.Color(style.ground);
+  const scene=new THREE.Scene();
+  scene.background=new THREE.Color(style.ground);
   const aspect=width/height;
-  const view=11.4;
+  const view=11.6;
   const camera=new THREE.OrthographicCamera(-view*aspect,view*aspect,view,-view,.1,100);
-  camera.position.set(13.5,15.5,13.5);camera.lookAt(0,0,0);
-  camera.zoom=1.04;camera.updateProjectionMatrix();
+  camera.position.set(15.2,18.5,15.2);camera.lookAt(0,0,0);camera.zoom=1.02;camera.updateProjectionMatrix();
   const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
-  renderer.setPixelRatio(Math.min(1.35,window.devicePixelRatio||1));renderer.setSize(width,height,false);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;host.innerHTML='';host.appendChild(renderer.domElement);
-  scene.add(new THREE.HemisphereLight(0xbfe3e8,0x19312c,1.65));
-  const sun=new THREE.DirectionalLight(0xffdfaa,1.95);sun.position.set(8,16,6);sun.castShadow=true;scene.add(sun);
-  const worldBase=new THREE.Mesh(new THREE.PlaneGeometry(23,23),new THREE.MeshStandardMaterial({color:style.ground,roughness:1}));worldBase.rotation.x=-Math.PI/2;worldBase.position.y=-.012;worldBase.receiveShadow=true;scene.add(worldBase);
+  renderer.setPixelRatio(Math.min(1.45,window.devicePixelRatio||1));renderer.setSize(width,height,false);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  host.innerHTML='';host.appendChild(renderer.domElement);renderer.domElement.style.touchAction='none';
+  scene.add(new THREE.HemisphereLight(0xd9efe5,0x27483d,1.9));
+  const sun=new THREE.DirectionalLight(0xffe0ad,2.2);sun.position.set(-10,18,10);sun.castShadow=true;scene.add(sun);
   const world=new THREE.Group();scene.add(world);
+  // Slight tilt is fixed; users can pan and zoom, not spin the city into unusable angles.
+  world.rotation.y=0;world.rotation.x=0;
   addHayDayCityAssets(world,c.citySeed||citySeed(c),c.level||1,{city:c,population:c.pop||0,style});
 
   let dragging=false,lastX=0,lastY=0;
-  renderer.domElement.style.touchAction='none';
   renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;renderer.domElement.setPointerCapture?.(e.pointerId)});
   renderer.domElement.addEventListener('pointerup',e=>{dragging=false;renderer.domElement.releasePointerCapture?.(e.pointerId)});
   renderer.domElement.addEventListener('pointercancel',()=>dragging=false);
+  renderer.domElement.addEventListener('pointerleave',()=>dragging=false);
   renderer.domElement.addEventListener('pointermove',e=>{
     if(!dragging)return;
     const dx=e.clientX-lastX,dy=e.clientY-lastY;
-    world.position.x+=dx*.015/camera.zoom;
-    world.position.z+=dy*.015/camera.zoom;
+    world.position.x+=dx*.018/camera.zoom;
+    world.position.z+=dy*.018/camera.zoom;
+    const lim=5.2;
+    world.position.x=THREE.MathUtils.clamp(world.position.x,-lim,lim);world.position.z=THREE.MathUtils.clamp(world.position.z,-lim,lim);
     lastX=e.clientX;lastY=e.clientY;
   });
-  renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();camera.zoom=THREE.MathUtils.clamp(camera.zoom*(e.deltaY<0?1.08:.93),.82,1.7);camera.updateProjectionMatrix();},{passive:false});
+  renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();camera.zoom=THREE.MathUtils.clamp(camera.zoom*(e.deltaY<0?1.09:.92),.72,1.9);camera.updateProjectionMatrix();},{passive:false});
   const rec={renderer,scene,camera,group:world,host};citySceneRecords.push(rec);return rec;
 }
-
 function buildNationalScene(host){
   if(!host||!state.nation)return null;
   const width=host.clientWidth||900,height=host.clientHeight||470;

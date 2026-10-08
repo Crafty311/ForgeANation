@@ -1,0 +1,240 @@
+import './style.css';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+const KEY='forgeNationV80';
+const SAVE_KEYS=['forgeNationV80','forgeNationV81','forgeNationSave'];
+const OLD_KEYS=['forgeNationV80','forgeNationV74','forgeNationV73','forgeNationV72','forgeNationV71','forgeNationV70'];
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const fmt=n=>new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format(n);
+const money=n=>n>=1e12?'$'+(n/1e12).toFixed(1)+'T':n>=1e9?'$'+(n/1e9).toFixed(1)+'B':n>=1e6?'$'+(n/1e6).toFixed(1)+'M':'$'+Math.round(n/1e3)+'K';
+const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+const focusDefs={
+ industrial:{name:'Industrial',desc:'Manufacturing & Industry',income:1.18,skills:{industry:2}},
+ commercial:{name:'Commercial',desc:'Trade & Finance',income:1.14,skills:{commerce:2}},
+ agricultural:{name:'Agricultural',desc:'Farming & Food',income:1.10,skills:{health:1,industry:1}},
+ technological:{name:'Technological',desc:'Innovation & Research',income:1.16,skills:{technology:2,education:1}},
+ cultural:{name:'Cultural',desc:'Arts & Tourism',income:1.09,skills:{culture:2}}
+};
+const skillDefs=[
+ {id:'industry',name:'Industry',icon:'⚙',effect:'+12% Production',base:1200000,gain:.12,cls:'gold'},
+ {id:'education',name:'Education',icon:'◆',effect:'+6% Research',base:800000,gain:.07,cls:'blue'},
+ {id:'infrastructure',name:'Infrastructure',icon:'⌂',effect:'+10% Efficiency',base:1500000,gain:.10,cls:'green'},
+ {id:'technology',name:'Technology',icon:'◈',effect:'+5% Innovation',base:1000000,gain:.09,cls:'cyan'},
+ {id:'health',name:'Healthcare',icon:'♥',effect:'+5% Health',base:700000,gain:.055,cls:'red'},
+ {id:'commerce',name:'Commerce',icon:'▣',effect:'+6% Trade',base:900000,gain:.08,cls:'teal'},
+ {id:'culture',name:'Culture',icon:'✦',effect:'+4% Tourism',base:600000,gain:.06,cls:'purple'}
+];
+const levels=[
+ {level:1,name:'Settling Nation',xp:0,unlock:'Basic economy'},
+ {level:2,name:'Growing Nation',xp:1000,unlock:'Development Store'},
+ {level:3,name:'Developing Nation',xp:3000,unlock:'Industrial districts'},
+ {level:4,name:'Modern Nation',xp:7000,unlock:'Advanced cities'},
+ {level:5,name:'Regional Power',xp:15000,unlock:'Major infrastructure'},
+ {level:6,name:'Major Power',xp:30000,unlock:'Global trade'},
+ {level:7,name:'Global Power',xp:60000,unlock:'World-class districts'},
+ {level:8,name:'World-Class Nation',xp:120000,unlock:'National landmarks'}
+];
+const CITY_STYLES=[
+ {name:'Coastal',ground:0x12364a,road:0x31515d,roof:0x9cb6bd,accent:0x46b6c9},
+ {name:'River Valley',ground:0x173d32,road:0x4a5550,roof:0xc7b79a,accent:0x65b98b},
+ {name:'Highlands',ground:0x24383b,road:0x4c5251,roof:0xb7c6cc,accent:0x7aa6d1},
+ {name:'Plains',ground:0x3b4028,road:0x55554a,roof:0xd0b783,accent:0xc8a84e},
+ {name:'Modern',ground:0x182b3d,road:0x394a59,roof:0xb8d7e7,accent:0x61d5d9},
+ {name:'Garden',ground:0x16382f,road:0x46564c,roof:0xd1c49e,accent:0x74c98d},
+ {name:'Industrial',ground:0x2b3034,road:0x4b4e50,roof:0x9b8f87,accent:0xd58d55},
+ {name:'Old Quarter',ground:0x3b3028,road:0x5b4d42,roof:0xc5a779,accent:0xd5ad5e}
+];
+function cityStyle(c){const n=state.nation||{};const seed=hashCity(`${n.name||'nation'}:${c?.name||'city'}`);return CITY_STYLES[seed%CITY_STYLES.length]}
+function hashCity(str){let h=2166136261;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function citySeed(c){return hashCity(`${state.nation?.name||'nation'}:${c?.name||'city'}:${c?.level||1}`)}
+function ensureCityVariants(n){
+  if(!n?.cities)return;
+  n.cities.forEach(c=>{if(!Number.isInteger(c.citySeed))c.citySeed=hashCity(`${n.name}:${c.name}`);});
+  const names=[
+    ['Eastport','Coastal Port'],['Westhaven','Industrial City'],['Lakeside','Tourism City'],
+    ['Highland','Mountain Town'],['New Meridian','University City'],['Southgate','Satellite City'],
+    ['Greenvale','Agricultural Town'],['Old Quarter','Historic City'],['Brighton','Regional City'],
+    ['Ironridge','Resource City'],['Meadowbrook','Agricultural Town'],['Harborview','Port City'],
+    ['Pinecrest','Mountain Town'],['Centralia','Regional City'],['Grand Junction','Transport City'],
+    ['Rivermouth','River City'],['Sunvale','Tourism City'],['Northgate','Satellite City'],
+    ['Stonebridge','Historic City'],['Cedar Falls','Regional City'],['Oakridge','Research City'],
+    ['Bayview','Coastal City'],['Mapleford','Regional City'],['Kingsway','Metropolitan City']
+  ];
+  const target=Math.min(25,3+Math.max(0,(n.cityLevel||3)-2)*2);
+  for(let i=n.cities.length;i<target;i++){
+    const [name,type]=names[i-3]||[`District ${i+1}`,'Regional City'];
+    n.cities.push({name,type,level:1,pop:Math.max(18000,Math.round(n.population*(0.025+((i%4)*.004)))),income:380000+i*28000,happiness:62+(i%9),citySeed:hashCity(`${n.name}:${name}`)});
+  }
+}
+
+
+const storeDefs=[
+ {id:'factory',name:'Factory',desc:'+120K/day · 5x Production',cost:2500000,inc:120000,req:1,cat:'Economic',img:'factory.svg'},
+ {id:'university',name:'University',desc:'+Research · +Education',cost:3200000,inc:70000,req:2,cat:'Civic',img:'university.svg'},
+ {id:'railway',name:'Railway',desc:'+Logistics · +Trade',cost:4800000,inc:180000,req:2,cat:'Economic',img:'railway.svg'},
+ {id:'airport',name:'Airport',desc:'+Tourism · +Trade',cost:6000000,inc:240000,req:3,cat:'Luxury',img:'airport.svg'},
+ {id:'hospital',name:'Hospital',desc:'+Health · +Happiness',cost:2800000,inc:65000,req:2,cat:'Civic',img:'hospital.svg'},
+ {id:'stadium',name:'Stadium',desc:'+Culture · +Happiness',cost:3500000,inc:85000,req:3,cat:'Culture',img:'stadium.svg'},
+ {id:'research',name:'Technology Campus',desc:'+Innovation · +Income',cost:7200000,inc:420000,req:4,cat:'Economic',img:'research.svg'},
+ {id:'finance',name:'Financial Center',desc:'+Commerce · +Trade',cost:9500000,inc:520000,req:5,cat:'Luxury',img:'finance.svg'}
+];
+const BUILD_DEFS=[
+ {id:'cottage',name:'Cozy Cottage',icon:'🏡',cat:'Residential',cost:220000,jobs:1,pop:80,happy:1,desc:'Small homes that make a neighborhood feel lived in.'},
+ {id:'apartment',name:'Apartment House',icon:'🏢',cat:'Residential',cost:620000,jobs:4,pop:260,happy:.5,desc:'More homes without spreading the city too far.'},
+ {id:'shop',name:'Local Shop',icon:'🏪',cat:'Commercial',cost:380000,income:52000,jobs:6,happy:.5,desc:'A little business for the neighborhood.'},
+ {id:'cafe',name:'Corner Café',icon:'☕',cat:'Commercial',cost:290000,income:38000,jobs:4,happy:1,desc:'A cozy meeting place for residents.'},
+ {id:'school',name:'Neighborhood School',icon:'🏫',cat:'Civic',cost:760000,jobs:12,pop:0,happy:2,education:2,desc:'Improves education and family life.'},
+ {id:'clinic',name:'Community Clinic',icon:'🏥',cat:'Civic',cost:680000,jobs:10,happy:2,health:2,desc:'Keeps the neighborhood healthy.'},
+ {id:'park',name:'Pocket Park',icon:'🌳',cat:'Nature',cost:180000,happy:3,green:2,desc:'Trees, benches and breathing room.'},
+ {id:'market',name:'Market Square',icon:'🧺',cat:'Commercial',cost:460000,income:72000,jobs:8,happy:2,trade:2,desc:'A lively place to buy and sell local goods.'},
+ {id:'workshop',name:'Workshop',icon:'🏭',cat:'Industrial',cost:980000,income:130000,jobs:24,industry:3,happy:-1,pollution:1,desc:'Creates jobs and production, with a little pollution.'},
+ {id:'warehouse',name:'Warehouse',icon:'📦',cat:'Industrial',cost:720000,income:88000,jobs:14,trade:2,desc:'Stores and moves the goods your city produces.'},
+ {id:'station',name:'Rail Station',icon:'🚉',cat:'Infrastructure',cost:1450000,income:110000,jobs:18,trade:4,desc:'Connects the city to the national network.'},
+ {id:'museum',name:'Local Museum',icon:'🏛️',cat:'Culture',cost:900000,income:26000,jobs:9,happy:3,culture:3,desc:'Turns local history into a reason to visit.'},
+ {id:'stadium',name:'Community Stadium',icon:'🏟️',cat:'Culture',cost:2100000,income:95000,jobs:30,happy:4,culture:4,desc:'A big landmark for sports and celebrations.'},
+ {id:'university',name:'University',icon:'🎓',cat:'Civic',cost:2800000,income:160000,jobs:45,happy:2,education:5,technology:3,desc:'Creates research, talent and a younger city.'}
+];
+const ZONE_DEFS=[
+ {id:'residential',name:'Residential',icon:'🏠',effect:'Housing capacity +',desc:'Reserve land for homes.'},
+ {id:'commercial',name:'Commercial',icon:'🛍️',effect:'Local trade +',desc:'Reserve land for shops and cafés.'},
+ {id:'industrial',name:'Industrial',icon:'🏭',effect:'Jobs & production +',desc:'Keep heavy activity away from homes.'},
+ {id:'park',name:'Green Space',icon:'🌿',effect:'Happiness +',desc:'Leave breathing room for parks.'}
+];
+const OPPORTUNITIES=[
+ {id:'deliveries',title:'Sort the Market Deliveries',icon:'📦',cat:'Economy',cost:45000,reward:120000,happy:1,xp:65,steps:['Put food in the grocery stall','Put books in the bookshop','Put flowers in the garden stall']},
+ {id:'park',title:'Decorate the Pocket Park',icon:'🌳',cat:'Nature',cost:35000,reward:0,happy:4,xp:60,steps:['Plant a tree','Place a bench','Add a flower bed']},
+ {id:'cafe',title:'Help the Corner Café',icon:'☕',cat:'Business',cost:55000,reward:95000,happy:2,xp:70,steps:['Take an order','Serve the customer','Clean the table']},
+ {id:'museum',title:'Assemble a Local Artifact',icon:'🖼️',cat:'Culture',cost:30000,reward:65000,happy:2,xp:75,steps:['Find the first fragment','Find the second fragment','Place the artifact in the case']},
+ {id:'rail',title:'Connect the Station',icon:'🚉',cat:'Infrastructure',cost:90000,reward:150000,happy:1,xp:90,steps:['Connect the east track','Connect the west track','Open the platform']},
+ {id:'neighbors',title:'Listen to Residents',icon:'👥',cat:'People',cost:15000,reward:0,happy:5,xp:80,steps:['Hear the first request','Choose a solution','Tell the neighborhood what changed']},
+ {id:'garden',title:'Grow a Community Garden',icon:'🌱',cat:'Nature',cost:25000,reward:30000,happy:4,xp:65,steps:['Prepare the soil','Plant vegetables','Open the garden to neighbors']},
+ {id:'construction',title:'Finish a Building',icon:'🔨',cat:'Build',cost:70000,reward:100000,happy:1,xp:85,steps:['Finish the foundation','Raise the walls','Open the doors']}
+];
+
+const defaultState={screen:'landing',nation:null,lastSeen:Date.now(),toast:'',awayEarned:0,ui:{sidebarCollapsed:false,mobileNav:false}};
+const cozyMoments=[
+ {id:'market',title:'Sunday Market',desc:'Set up a little market square. Citizens browse, chat and spend.',cost:180000,reward:260000,happy:3,xp:90,icon:'🧺',costAP:1,cat:'Economy'},
+ {id:'park',title:'Plant a Pocket Park',desc:'Give a neighborhood somewhere quiet to sit under the trees.',cost:120000,reward:0,happy:4,xp:80,icon:'🌳',costAP:1,cat:'Improve'},
+ {id:'cafe',title:'Open a Corner Café',desc:'A tiny café becomes a favorite meeting place.',cost:150000,reward:210000,happy:2,xp:75,icon:'☕',costAP:1,cat:'Business'},
+ {id:'playground',title:'Build a Playground',desc:'Add swings and a little play space for local families.',cost:90000,reward:0,happy:3,xp:65,icon:'🛝',costAP:1,cat:'Improve'},
+ {id:'library',title:'Open a Neighborhood Library',desc:'Books, study tables and a warm place to spend an afternoon.',cost:220000,reward:0,happy:4,xp:110,icon:'📚',costAP:1,cat:'People'},
+ {id:'festival',title:'Lantern Evening',desc:'A small evening festival fills the streets with music and lights.',cost:250000,reward:330000,happy:6,xp:130,icon:'🏮',costAP:2,cat:'Fun'},
+ {id:'clean',title:'Clean-Up Day',desc:'Citizens volunteer to tidy streets and public spaces.',cost:45000,reward:0,happy:2,xp:55,icon:'🧹',costAP:1,cat:'Improve'},
+ {id:'street',title:'Pretty Up a Street',desc:'Fresh paving, planters and lights turn an ordinary street into a favorite walk.',cost:140000,reward:0,happy:3,xp:70,icon:'🌷',costAP:1,cat:'Improve'},
+ {id:'museum',title:'Open a Tiny Exhibit',desc:'Display a local treasure and attract curious visitors.',cost:175000,reward:120000,happy:3,xp:95,icon:'🖼️',costAP:1,cat:'Culture'},
+ {id:'neighbors',title:'Neighborhood Gathering',desc:'Listen to residents and help them solve a small local problem.',cost:60000,reward:0,happy:5,xp:85,icon:'👥',costAP:1,cat:'People'},
+ {id:'garden',title:'Community Garden',desc:'Turn an empty corner into a shared garden.',cost:80000,reward:40000,happy:4,xp:70,icon:'🌱',costAP:1,cat:'Improve'},
+ {id:'concert',title:'Small Street Concert',desc:'Local musicians bring the square to life.',cost:190000,reward:150000,happy:5,xp:105,icon:'🎵',costAP:2,cat:'Fun'}
+];
+const dailyEvents=[
+ {id:'sunny',icon:'☀️',title:'A Bright Day',desc:'People are out and about. Parks and cafés feel especially lively.',bonus:{happy:1}},
+ {id:'rain',icon:'🌧️',title:'A Rainy Day',desc:'The streets are wet, but cafés and libraries are unusually busy.',bonus:{income:0.08}},
+ {id:'festival',icon:'🎪',title:'Festival Weekend',desc:'Festive spirit fills the streets. Fun activities give extra happiness.',bonus:{happy:2,fun:0.25}},
+ {id:'market',icon:'🧺',title:'Market Day',desc:'Local stalls are everywhere. Economy activities earn more today.',bonus:{reward:0.18}},
+ {id:'garden',icon:'🌱',title:'Green Week',desc:'Residents want a greener neighborhood. Improvement activities feel extra rewarding.',bonus:{happy:2,improve:0.25}},
+ {id:'heritage',icon:'🏛️',title:'Heritage Day',desc:'People are curious about the stories behind your cities.',bonus:{culture:0.25}}
+];
+const seasons=['Summer','Monsoon','Autumn','Winter','Spring'];
+function internalDate(n){const day=Math.max(1,n?.cozy?.dayIndex||1),year=Math.floor((day-1)/25)+1,dayOfYear=((day-1)%25)+1,season=seasons[Math.floor((dayOfYear-1)/5)]||'Spring';return {day,year,dayOfYear,season};}
+function dayKey(n=state?.nation){return `day-${Math.max(1,n?.cozy?.dayIndex||1)}`}
+function cozyFor(n){
+ n.cozy=n.cozy||{};
+ n.cozy.dayIndex=Math.max(1,n.cozy.dayIndex||1);
+ n.cozy.done=Array.isArray(n.cozy.done)?n.cozy.done:[];
+ n.cozy.streak=Number(n.cozy.streak)||0;
+ n.cozy.collection=Array.isArray(n.cozy.collection)?n.cozy.collection:[];
+ n.cozy.selectedCity=clamp(Number(n.cozy.selectedCity)||0,0,Math.max(0,(n.cities?.length||1)-1));
+ n.cozy.activeOpportunity=n.cozy.activeOpportunity||null;
+ n.cozy.opportunityStep=Number(n.cozy.opportunityStep)||0;
+ if(n.cozy.day!==dayKey(n)) startCozyDay(n);
+ return n.cozy;
+}
+function dailyEvent(n){return dailyEvents[hashCity(`${n.name}:${n.cozy?.dayIndex||1}`)%dailyEvents.length]||dailyEvents[0]}
+function selectedCity(){const n=state.nation;cozyFor(n);return n.cities[clamp(Number(n.cozy.selectedCity)||0,0,Math.max(0,n.cities.length-1))]||n.cities[0]}
+function chooseCity(i){const n=state.nation;cozyFor(n);n.cozy.selectedCity=clamp(Number(i)||0,0,n.cities.length-1);save();renderGame()}
+function startCozyDay(n){
+ n.cozy=n.cozy||{};n.cozy.day=n.cozy.day||dayKey(n);n.cozy.done=[];n.cozy.failed=[];n.cozy.won=[];n.cozy.dayEnded=false;n.cozy.activeOpportunity=null;n.cozy.opportunityStep=0;
+ const seed=hashCity(`${n.name}:${n.cozy.dayIndex}`);const picks=[];for(let i=0;i<5;i++)picks.push(OPPORTUNITIES[(seed+i*3)%OPPORTUNITIES.length].id);n.cozy.tasks=[...new Set(picks)];while(n.cozy.tasks.length<5){const extra=OPPORTUNITIES[(seed+n.cozy.tasks.length*7+11)%OPPORTUNITIES.length].id;if(!n.cozy.tasks.includes(extra))n.cozy.tasks.push(extra);}
+ n.cozy.eventId=dailyEvents[seed%dailyEvents.length].id;n.cozy.mailbox=n.cozy.mailbox||[];
+}
+function activeOpportunity(n){cozyFor(n);return OPPORTUNITIES.find(x=>x.id===n.cozy.activeOpportunity)||null}
+const MINI_GAMES=[
+ {id:'rps',name:'Rock, Paper, Scissors',icon:'✊',desc:'Beat the town challenger. Play as many rounds as you like.'},
+ {id:'ttt',name:'Tic-Tac-Toe',icon:'⭕',desc:'Outsmart the town champion on a little 3×3 board.'},
+ {id:'coin',name:'Heads or Tails',icon:'🪙',desc:'Call the flip. Keep playing until you feel lucky.'},
+ {id:'fingers',name:'Most Fingers Wins',icon:'🖐️',desc:'Choose 0–5 fingers. The town chooses too; highest number wins.'}
+];
+function gameForOpportunity(n,id){const z=cozyFor(n);const idx=z.tasks.indexOf(id);const seed=hashCity(`${n.name}:${z.dayIndex}:${id}:game`);return MINI_GAMES[(seed+(idx<0?0:idx))%MINI_GAMES.length];}
+function randomMiniGame(){return MINI_GAMES[Math.floor(Math.random()*MINI_GAMES.length)];}
+function miniGameDef(n){return MINI_GAMES.find(g=>g.id===n?.cozy?.activeGame?.type)||MINI_GAMES[0];}
+function freshTtt(){return {board:Array(9).fill(''),turn:'X',winner:null};}
+function beginOpportunity(id){
+ const n=state.nation,z=cozyFor(n),op=OPPORTUNITIES.find(x=>x.id===id);
+ if(!op||z.done.includes(id)||z.failed?.includes(id))return;
+ if(n.money<op.cost)return toast(`You need ${money(op.cost)} for this.`);
+ const game=gameForOpportunity(n,id);
+ z.activeOpportunity=id;z.opportunityStep=0;
+ z.activeGame={type:game.id,rounds:0,wins:0,losses:0,draws:0,score:0,streak:0,lastResult:'',ttt:freshTtt(),coin:null,fingers:null,rps:null};
+ save();renderGame();
+}
+function completeWonActivity(op,g){
+ const n=state.nation,z=cozyFor(n);n.money-=op.cost;
+ const ev=dailyEvent(n),bonus=op.cat==='Nature'?(ev.bonus?.improve||0):op.cat==='Economy'?(ev.bonus?.reward||0):op.cat==='Culture'?(ev.bonus?.culture||0):op.cat==='Fun'?(ev.bonus?.fun||0):0;
+ const reward=Math.round(op.reward*(1+bonus));n.money+=reward;n.xp+=op.xp;
+ const mood=Math.round(op.happy);n.happiness=clamp(n.happiness+mood+(ev.bonus?.happy||0),0,100);const c=selectedCity();c.happiness=clamp((c.happiness||65)+mood,0,100);
+ c.cozy=c.cozy||{projects:[],mood:0,decor:[],requests:[]};c.cozy.projects.push({id:op.id,at:z.dayIndex,game:g.type,wins:g.wins,rounds:g.rounds});c.cozy.mood=(c.cozy.mood||0)+mood;
+ if(!z.collection.includes(op.id))z.collection.push(op.id);z.done.push(op.id);z.won.push(op.id);z.activeOpportunity=null;z.activeGame=null;z.opportunityStep=0;
+ n.history.unshift(`${op.title}: won ${g.type} after ${g.rounds} round${g.rounds===1?'':'s'}.`);
+ save();toast(`🏆 ${op.icon} ${op.title} won · ${money(reward)} earned`);renderGame();
+}
+function failActivity(op,g){
+ const n=state.nation,z=cozyFor(n);z.failed=z.failed||[];if(!z.failed.includes(op.id))z.failed.push(op.id);z.activeOpportunity=null;z.activeGame=null;z.opportunityStep=0;
+ n.history.unshift(`${op.title}: failed the ${miniGameDef({cozy:{activeGame:g}}).name}.`);
+ save();toast(`❌ ${op.icon} ${op.title} failed. This activity is unavailable today.`);renderGame();
+}
+function resolveActivityResult(result){
+ const n=state.nation,z=cozyFor(n),op=activeOpportunity(n),g=z.activeGame;if(!op||!g||!result||g.pendingResult)return;
+ g.rounds++;
+ if(result==='draw'){g.draws++;g.lastResult='draw';sfx('draw');save();renderGame();return;}
+ g.lastResult=result;
+ g.pendingResult=result;
+ if(result==='win'){g.wins++;g.streak++;sfx('success');}
+ else {g.losses++;g.streak=0;sfx('fail');}
+ save();renderGame();
+}
+function closeActivityResult(){
+ const n=state.nation,z=cozyFor(n),op=activeOpportunity(n),g=z.activeGame;if(!op||!g||!g.pendingResult)return;
+ const result=g.pendingResult;g.pendingResult=null;
+ if(result==='win')completeWonActivity(op,g);
+ else failActivity(op,g);
+}
+function finishOpportunity(){
+ const n=state.nation,z=cozyFor(n);if(z.activeOpportunity)return toast('Win or lose the activity first.');
+}
+function tttWinner(b){
+ const lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+ for(const [a,c,d] of lines)if(b[a]&&b[a]===b[c]&&b[a]===b[d])return b[a];return b.every(Boolean)?'draw':null;
+}
+function tttAi(b){
+ const empty=b.map((v,i)=>v?null:i).filter(v=>v!==null);if(!empty.length)return;
+ // The town champion is intentionally fallible: it should feel like a cozy
+ // resident challenge, not an unwinnable minimax puzzle. It only plays a
+ // tactical move occasionally, otherwise it chooses a plausible open square.
+ if(Math.random()<0.34){
+  for(const mark of ['O','X'])for(const i of empty){const x=b.slice();x[i]=mark;if(tttWinner(x)===mark)return i;}
+ }
+ if(Math.random()<0.35 && empty.includes(4))return 4;
+ const preferred=empty.filter(i=>[0,2,6,8].includes(i));
+ if(preferred.length&&Math.random()<0.55)return preferred[Math.floor(Math.random()*preferred.length)];
+ return empty[Math.floor(Math.random()*empty.length)];
+}
+function miniGameAction(action,value){
+ const n=state.nation,z=cozyFor(n),g=z.activeGame;if(!g||g.revealing)return;let result='';g.revealing=true;
+ if(g.type==='rps'){
+  const choices=['rock','paper','scissors'],player=String(value),ai=choices[Math.floor(Math.random()*3)];g.rps={player,ai,revealing:true};result=player===ai?'draw':((player==='rock'&&ai==='scissors')||(player==='paper'&&ai==='rock')||(player==='scissors'&&ai==='paper'))?'win':'loss';
+ }else if(g.type==='coin'){
+  const player=String(value),ai=(window.crypto?.getRandomValues ? (window.crypto.getRandomValues(new Uint32Array(1))[0] % 2 ? 'heads' : 'tails') : (Math.random()<.5?'heads':'tails'));sfx('coin');g.coin={player,ai,flipping:true};result=player===ai?'win':'loss';
