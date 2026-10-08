@@ -647,18 +647,55 @@ function addKenneyCityAssets(group,seed,level,opts={}){
   ]).then(([residential,commercial,industrial,towers,roads,nature,citizens])=>{
     const district=new THREE.Group();district.name='Built From Kenney Packs';city.add(district);
     const worldR=radius, coreR=Math.min(2.8+lvl*.32,5.1);
-    // Real starter-kit road pieces form the street skeleton.
+    // Kenney Starter Kit roads are modular 1x1 tiles. Build a true snapped
+    // network: every tile shares the same grid spacing, and intersections
+    // replace straight tiles at crossings instead of being stacked on top.
     const rg=new THREE.Group();rg.name='Road Network';district.add(rg);
     const road=roads[0], cross=roads[2]||road;
-    for(let i=-2;i<=2;i++){
-      const a=cloneKenney(road);a.position.set(i*2.65,.02,-worldR*1.02);a.scale.setScalar(.78);rg.add(a);
-      const b=cloneKenney(road);b.position.set(i*2.65,.021,worldR*1.02);b.rotation.y=Math.PI;b.scale.setScalar(.78);rg.add(b);
+    const tile=2.18;
+    const half=Math.max(2,Math.floor((worldR*1.55)/tile));
+    const span=half*tile;
+    const key=(x,z)=>`${x}:${z}`;
+    const nodes=new Set();
+    const addTile=(src,x,z,rot=0)=>{
+      const m=cloneKenney(src);
+      m.scale.setScalar(tile);
+      m.rotation.y=rot;
+      m.position.set(x,.035,z);
+      rg.add(m);
+    };
+    // Two connected arterial lines plus a compact local grid.
+    const xs=[];for(let x=-half;x<=half;x++)xs.push(x*tile);
+    const zs=[];for(let z=-half;z<=half;z++)zs.push(z*tile);
+    const horizontal=[-tile*2,0,tile*2];
+    const vertical=[-tile*2,0,tile*2];
+    horizontal.forEach(z=>{
+      for(let x=-span;x<=span;x+=tile){nodes.add(key(Math.round(x/tile),Math.round(z/tile)));}
+    });
+    vertical.forEach(x=>{
+      for(let z=-span;z<=span;z+=tile){nodes.add(key(Math.round(x/tile),Math.round(z/tile)));}
+    });
+    // Place one intersection at every crossing and straight modules between.
+    horizontal.forEach(z=>{
+      for(let x=-span;x<=span;x+=tile){
+        const crossing=vertical.some(v=>Math.abs(v-x)<.01);
+        if(!crossing)addTile(road,x,z,0);
+      }
+    });
+    vertical.forEach(x=>{
+      for(let z=-span;z<=span;z+=tile){
+        const crossing=horizontal.some(h=>Math.abs(h-z)<.01);
+        if(!crossing)addTile(road,x,z,Math.PI/2);
+      }
+    });
+    horizontal.forEach(z=>vertical.forEach(x=>addTile(cross,x,z,0)));
+    // Short feeder roads connect the arterial grid to the outer neighbourhoods.
+    for(const z of [-tile*4,tile*4]){
+      for(let x=-tile*2;x<=tile*2;x+=tile)addTile(road,x,z,0);
     }
-    for(let i=-2;i<=2;i++){
-      const a=cloneKenney(road);a.position.set(-worldR*1.02,i*2.65,.02);a.rotation.y=Math.PI/2;a.scale.setScalar(.78);rg.add(a);
-      const b=cloneKenney(road);b.position.set(worldR*1.02,i*2.65,.021);b.rotation.y=-Math.PI/2;b.scale.setScalar(.78);rg.add(b);
+    for(const x of [-tile*4,tile*4]){
+      for(let z=-tile*2;z<=tile*2;z+=tile)addTile(road,x,z,Math.PI/2);
     }
-    const junction=cloneKenney(cross);junction.position.set(0,.025,0);junction.scale.setScalar(.82);rg.add(junction);
 
     // Residential growth uses actual Starter Kit buildings, not primitive boxes.
     const homes=new THREE.Group();homes.name='Residential';district.add(homes);
