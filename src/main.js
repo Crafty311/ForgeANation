@@ -5,7 +5,7 @@ import { loadState, saveState as persistState, clearSaves, SAVE_VERSION } from '
 import { internalDate, dayKey, advanceDay } from './game/calendar.js';
 import { nationalBuildingEffects, cityPopulationCapacity, cityJobs } from './game/economy.js';
 
-const GAME_VERSION='2.15.0.2';
+const GAME_VERSION='2.15.0.3';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const fmt=n=>new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format(n);
@@ -345,7 +345,25 @@ function stopMusic(){if(AUDIO.loopTimer){clearTimeout(AUDIO.loopTimer);AUDIO.loo
 function tone(freq,dur,type='sine',gain=.025,delay=0){if(!soundEnabled()||!AUDIO.ctx)return;const c=AUDIO.ctx,o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.setValueAtTime(freq,c.currentTime+delay);g.gain.setValueAtTime(.0001,c.currentTime+delay);g.gain.exponentialRampToValueAtTime(gain,c.currentTime+delay+.008);g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+delay+dur);o.connect(g).connect(c.destination);o.start(c.currentTime+delay);o.stop(c.currentTime+delay+dur+.02);}
 function sfx(kind='click'){ensureAudio();if(!soundEnabled())return;if(AUDIO.ctx?.state==='suspended')AUDIO.ctx.resume();if(kind==='click'){tone(520,.045,'sine',.018);tone(760,.025,'sine',.008,.018)}else if(kind==='open'){tone(360,.06,'sine',.018);tone(620,.09,'sine',.012,.035)}else if(kind==='success'){tone(520,.07,'sine',.025);tone(660,.08,'sine',.022,.06);tone(820,.13,'sine',.018,.13)}else if(kind==='fail'){tone(190,.11,'triangle',.025);tone(140,.16,'triangle',.018,.08)}else if(kind==='draw'){tone(430,.08,'sine',.018);tone(430,.08,'sine',.012,.11)}else if(kind==='coin'){tone(720,.035,'triangle',.012);tone(920,.035,'triangle',.012,.04);tone(1120,.06,'triangle',.01,.08)}}
 function toggleSound(){state.ui=state.ui||{};state.ui.soundMuted=!state.ui.soundMuted;save();ensureAudio();if(state.ui.soundMuted)stopMusic();else{startMusic();sfx('success')}renderGame();}
-function topbar(){const n=state.nation,d=internalDate(n);return `<header class="topbar"><div class="topleft"><button class="menubtn" data-action="toggle-sidebar" aria-label="Open navigation">☰</button><button class="soundbtn" data-action="toggle-sound" aria-label="Toggle sound">${state.ui?.soundMuted?'🔇':'🔊'}</button><div class="topdate"><b>Year ${d.year} · ${d.season} · Day ${d.dayOfYear}</b></div><div class="topactions"><button class="topaction secondary" data-action="new">＋ <span>New Nation</span></button></div></div><div class="topbrand">FORGE A NATION</div><div class="topstats"><div class="topstat"><span><b>${money(n.money)}</b><small>Money</small></span></div><div class="topstat"><span><b>${fmt(n.population/1e6)}M</b><small>Population</small></span></div><div class="topstat"><span><b>${Math.round(n.reputation)}</b><small>Reputation</small></span></div><div class="topcredit">Made by Sajid · <a href="https://www.instagram.com/sajidaddin" target="_blank" rel="noopener noreferrer">@sajidaddin</a> · <a href="https://www.instagram.com/sajidphobic" target="_blank" rel="noopener noreferrer">@sajidphobic</a></div></div></header>`;}
+function topbar(){
+  const n=state.nation,d=internalDate(n);
+  return `<header class="topbar">
+    <div class="topleft">
+      <button class="menubtn" data-action="toggle-sidebar" aria-label="Open navigation">☰</button>
+      <button class="soundbtn" data-action="toggle-sound" aria-label="Toggle sound">${state.ui?.soundMuted?'🔇':'🔊'}</button>
+      <div class="topdate"><b>Year ${d.year} · ${d.season} · Day ${d.dayOfYear}</b></div>
+      <div class="topactions"><button class="topaction secondary" data-action="new">＋ <span>New Nation</span></button></div>
+    </div>
+    <div class="topbrand">FORGE A NATION</div>
+    <div class="topstats">
+      <div class="topstat"><span><b>${money(n.money)}</b><small>Money</small></span></div>
+      <div class="topstat"><span><b>${fmt(n.population/1e6)}M</b><small>Population</small></span></div>
+      <div class="topstat"><span><b>${Math.round(n.reputation)}</b><small>Reputation</small></span></div>
+      <div class="topcredit"><b>Made by Sajid</b><span class="topcredit-links"><a href="https://www.instagram.com/sajidaddin" target="_blank" rel="noopener noreferrer">@sajidaddin</a> · <a href="https://www.instagram.com/sajidphobic" target="_blank" rel="noopener noreferrer">@sajidphobic</a></span></div>
+    </div>
+  </header>`;
+}
+
 function mobileStatus(){return `<nav class="mobile-bottom-nav" aria-label="Mobile navigation"><button data-screen="home" class="${state.screen==='home'?'active':''}">⌂<span>Home</span></button><button data-screen="map" class="${state.screen==='map'?'active':''}">●<span>Map</span></button><button data-screen="cities" class="${state.screen==='cities'?'active':''}">▥<span>Cities</span></button><button data-screen="citybuilder" class="${state.screen==='citybuilder'?'active':''}">🏗<span>Build</span></button><button data-action="toggle-sidebar" class="${state.ui?.mobileNav?'active':''}">☰<span>More</span></button></nav>`;}
 function sidebar(){const items=[['home','⌂','Home'],['map','●','Map'],['cities','▥','Cities'],['citybuilder','🏗','Build City'],['buildings','▣','Buildings'],['skills','◈','Skills'],['development','◆','Development'],['store','▤','Store'],['statistics','▥','Statistics'],['achievements','★','Achievements'],['history','▤','History'],['settings','⚙','Settings']];const collapsed=!!state.ui?.sidebarCollapsed;return `<aside class="sidebar ${collapsed?'collapsed':''} ${state.ui?.mobileNav?'mobile-open':''}" aria-label="Nation navigation"><div class="brand"><h1>FN</h1></div><div class="sidehint">${collapsed?'':'YOUR NATION'}</div><nav aria-label="Game sections">${items.map(([id,ic,label])=>`<button class="navitem ${state.screen===id?'active':''}" data-screen="${id}" title="${label}" aria-label="${label}">${icon(ic)}<span>${label}</span></button>`).join('')}</nav>${credits()}</aside><div class="navscrim ${state.ui?.mobileNav?'show':''}" data-action="close-mobile-nav"></div>`;}
 function dailyStats(){const n=state.nation,e=nationalBuildingEffects(n,BUILD_DEFS,storeDefs);return {income:income(),population:dailyPopulationGrowth(n),happiness:.12+(e.happiness||0)*.01,reputation:(e.reputation||0)*.01};}
@@ -836,40 +854,57 @@ function nationalDevelopmentScore(n){
 function addNationalAssetVisuals(world,n,cities,positions){
   const assets=n.assets||{};
   const mat=(color,rough=.72,metal=0)=>new THREE.MeshStandardMaterial({color,roughness:rough,metalness:metal});
-  const addBox=(g,w,h,d,color,x,y,z,rough=.72)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color,rough));m.position.set(x,y,z);m.castShadow=true;g.add(m);return m;};
-  const addTower=(g,x,z,h,color)=>{const m=addBox(g,.34,h,.34,color,x,h/2+.05,z,.45);for(let y=.28;y<h;y+=.28)addBox(g,.12,.07,.025,0xd6d5bc,x,y,z+.18,.4);return m;};
+  const addBox=(g,w,h,d,color,x,y,z,rough=.72)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color,rough));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;g.add(m);return m;};
+  const addTower=(g,x,z,h,color,scale=1)=>{const m=addBox(g,.42*scale,h*scale,.42*scale,color,x,(h*scale)/2+.06,z,.45);for(let y=.28;y<h;y+=.28)addBox(g,.14*scale,.07*scale,.025*scale,0xd6d5bc,x,y*scale,z+.22*scale,.4);return m;};
   const place=(type,count,cityOffset=0)=>{
     for(let i=0;i<count;i++){
+      // National landmarks deliberately live OUTSIDE the compact city footprint.
+      // This makes every Store purchase visibly readable on the national map.
       const cityIndex=cities.length?((i+cityOffset)%cities.length):0;
       const [cx,cz]=positions[cityIndex]||[0,0];
-      const angle=hashCity(`${n.name}:asset:${type}:${i}`)%360*Math.PI/180;
-      const radius=1.0+(i%3)*.65;
-      const x=cx+Math.cos(angle)*radius,z=cz+Math.sin(angle)*radius*.72;
-      const g=new THREE.Group();g.position.set(0,.05,0);world.add(g);
+      const angle=(hashCity(`${n.name}:national-landmark:${type}:${i}`)%360)*Math.PI/180;
+      const radius=4.1+(i%3)*.72;
+      const x=Math.max(-11.2,Math.min(11.2,cx+Math.cos(angle)*radius));
+      const z=Math.max(-8.0,Math.min(8.0,cz+Math.sin(angle)*radius*.72));
+      const g=new THREE.Group();g.position.set(0,.05,0);g.name=`National Landmark: ${type} ${i+1}`;world.add(g);
+      const s=1.35+Math.min(2,count)*.12;
+      // Landmark plot/base makes the purchase readable even when surrounded by a developed country.
+      addBox(g,2.25*s,.045,1.75*s,0x27383c,x,.075,z,.96);
       if(type==='factory'){
-        addBox(g,1.0,.65,.75,0x7f7770,x,.38,z);addBox(g,.72,.10,.55,0x59666a,x,.76,z);
-        const chimney=addBox(g,.14,.72,.14,0x806c61,x+.32,.42,z-.18,.65);chimney.rotation.z=.02;
+        addBox(g,1.25*s,.78*s,.92*s,0x7f7770,x,.47*s,z);addBox(g,.92*s,.12*s,.68*s,0x59666a,x,.91*s,z);
+        addBox(g,.17*s,.92*s,.17*s,0x806c61,x+.42*s,.51*s,z-.22*s,.65);
       }else if(type==='university'){
-        addBox(g,1.15,.52,.9,0xc8c4b2,x,.31,z);const dome=new THREE.Mesh(new THREE.SphereGeometry(.28,14,8,0,Math.PI*2,0,Math.PI/2),mat(0x688894,.55));dome.position.set(x,.83,z);g.add(dome);
+        addBox(g,1.45*s,.64*s,1.05*s,0xc8c4b2,x,.38*s,z);const dome=new THREE.Mesh(new THREE.SphereGeometry(.34*s,16,10,0,Math.PI*2,0,Math.PI/2),mat(0x688894,.55));dome.position.set(x,.98*s,z);g.add(dome);
+        addBox(g,.22*s,.35*s,.22*s,0x8e816c,x,.56*s,z-.66*s);
       }else if(type==='railway'){
-        addBox(g,1.5,.22,.65,0xb9b4a4,x,.16,z);addBox(g,1.25,.07,.85,0x5d7882,x,.52,z,.55);
-        addBox(g,1.7,.035,.045,0x9c8769,x,.06,z-.48,.8);addBox(g,1.7,.035,.045,0x9c8769,x,.06,z+.48,.8);
+        addBox(g,1.75*s,.28*s,.78*s,0xb9b4a4,x,.22*s,z);addBox(g,1.5*s,.09*s,.98*s,0x5d7882,x,.55*s,z,.55);
+        addBox(g,2.05*s,.045*s,.055*s,0x9c8769,x,.075,z-.56*s,.8);addBox(g,2.05*s,.045*s,.055*s,0x9c8769,x,.075,z+.56*s,.8);
       }else if(type==='airport'){
-        addBox(g,2.5,.025,.62,0x2c3438,x,.07,z,.95);addBox(g,.52,.07,1.0,0xd8d0bf,x,.12,z,.8);
-        addBox(g,.06,.02,.46,0xe5c36a,x,.17,z-.42,.7);
+        addBox(g,3.0*s,.035*s,.72*s,0x2c3438,x,.09,z,.95);addBox(g,.64*s,.085*s,1.25*s,0xd8d0bf,x,.16*s,z,.8);
+        addBox(g,.08*s,.025*s,.58*s,0xe5c36a,x,.22*s,z-.52*s,.7);
+        addBox(g,1.2*s,.08*s,.18*s,0x718a92,x,.18*s,z+.25*s,.65);
       }else if(type==='hospital'){
-        addBox(g,1.1,.62,.82,0xd9dedb,x,.35,z);addBox(g,.48,.17,.035,0xc85858,x,.68,z+.43,.55);addBox(g,.06,.35,.035,0xc85858,x,.68,z+.46,.5);
+        addBox(g,1.35*s,.72*s,.98*s,0xd9dedb,x,.43*s,z);addBox(g,.58*s,.20*s,.04*s,0xc85858,x,.83*s,z+.51*s,.55);addBox(g,.07*s,.42*s,.04*s,0xc85858,x,.83*s,z+.54*s,.5);
       }else if(type==='stadium'){
-        const ring=new THREE.Mesh(new THREE.TorusGeometry(.62,.16,10,28),mat(0x778d9b,.6));ring.rotation.x=Math.PI/2;ring.position.set(x,.28,z);g.add(ring);addBox(g,1.0,.12,.72,0x718a62,x,.14,z,1);
+        const ring=new THREE.Mesh(new THREE.TorusGeometry(.78*s,.19*s,12,32),mat(0x778d9b,.6));ring.rotation.x=Math.PI/2;ring.position.set(x,.34*s,z);g.add(ring);addBox(g,1.22*s,.14*s,.86*s,0x718a62,x,.17*s,z,1);
       }else if(type==='research'){
-        addTower(g,x-.32,z,1.35,0x657f88);addTower(g,x+.32,z+.08,1.0,0x8c7771);addBox(g,.95,.08,.55,0x596d75,x,.08,z+.28,.55);
+        addTower(g,x-.42*s,z,1.65,0x657f88,s);addTower(g,x+.42*s,z+.08*s,1.25,0x8c7771,s);addBox(g,1.15*s,.10*s,.66*s,0x596d75,x,.10*s,z+.32*s,.55);
       }else if(type==='finance'){
-        addTower(g,x,z,1.9,0x708b96);addTower(g,x+.45,z+.05,1.25,0x8c7771);addBox(g,.95,.06,.7,0x596d75,x,.08,z,.55);
+        addTower(g,x,z,2.25,0x708b96,s);addTower(g,x+.55*s,z+.08*s,1.5,0x8c7771,s);addBox(g,1.18*s,.08*s,.82*s,0x596d75,x,.10*s,z,.55);
       }
+      // A short access road connects the landmark to its city's real road network.
+      const roadMat=new THREE.MeshStandardMaterial({color:0x27383c,roughness:.94});
+      const access=new THREE.CatmullRomCurve3([
+        new THREE.Vector3(cx,.045,cz),
+        new THREE.Vector3((cx+x)/2,.045,(cz+z)/2),
+        new THREE.Vector3(x,.045,z)
+      ]);
+      g.add(new THREE.Mesh(new THREE.TubeGeometry(access,18,.045,5,false),roadMat));
     }
   };
   for(const d of storeDefs) place(d.id,Math.min(12,Number(assets[d.id])||0));
 }
+
 function addNationalRoadDevelopment(world,n,cities,positions,route){
   const roadMat=new THREE.MeshStandardMaterial({color:0x27383c,roughness:.94});
   const railMat=new THREE.MeshStandardMaterial({color:0x9c8769,roughness:.8});
