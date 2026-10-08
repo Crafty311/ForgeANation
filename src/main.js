@@ -342,7 +342,7 @@ function addRoadToCity(){const n=state.nation,c=selectedCity(),cost=Math.round(2
 function zoneCity(id){const c=selectedCity();c.zones=c.zones||{};c.zones[id]=(c.zones[id]||0)+1;c.happiness=clamp((c.happiness||65)+(id==='park'?1:.15),0,100);save();toast(`${ZONE_DEFS.find(z=>z.id===id)?.icon||'◈'} ${ZONE_DEFS.find(z=>z.id===id)?.name||id} land reserved`);renderGame();}
 
 function collectAway(){tick();const e=state.nation.awayEarned||0;state.nation.awayEarned=0;save();toast(e>0?`Collected ${money(e)} while you were away`:'No pending rewards');renderGame();}
-function continuePlaying(){tick();const e=state.nation.awayEarned||0;state.nation.awayEarned=0;state.screen='home';save();renderGame();const el=document.querySelector('.dashboardgrid');el?.scrollIntoView({behavior:'smooth',block:'start'});setTimeout(()=>toast(e>0?`Welcome back — ${money(e)} collected.`:'Welcome back to your nation.'),120);}
+function continuePlaying(){tick();state.screen='home';save();renderGame();const el=document.querySelector('.dashboardgrid');el?.scrollIntoView({behavior:'smooth',block:'start'});setTimeout(()=>toast('Welcome back to your nation.'),120);}
 function toast(msg){state.toast=msg;renderGame();clearTimeout(window.__toast);window.__toast=setTimeout(()=>{state.toast='';renderGame()},2200)}
 function credits(){return `<div class="credits">Made by Sajid<br><span>Instagram: <a href="https://www.instagram.com/sajidaddin" target="_blank" rel="noopener noreferrer">@sajidaddin</a> · <a href="https://www.instagram.com/sajidphobic" target="_blank" rel="noopener noreferrer">@sajidphobic</a></span></div>`;}
 function icon(s,cls=''){return `<span class="uiicon ${cls}">${s}</span>`;}
