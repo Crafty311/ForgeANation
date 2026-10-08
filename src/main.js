@@ -643,78 +643,90 @@ function addKenneyCityAssets(group,seed,level,opts={}){
   const city=new THREE.Group();city.name='Kenney City Districts';group.add(city);
   Promise.all([
     loadAssetSet(LOCAL_ASSETS.residential),loadAssetSet(LOCAL_ASSETS.commercial),loadAssetSet(LOCAL_ASSETS.industrial),
-    loadAssetSet(LOCAL_ASSETS.towers),loadAssetSet(LOCAL_ASSETS.roads),loadAssetSet(LOCAL_ASSETS.nature),loadAssetSet(LOCAL_ASSETS.citizens)
-  ]).then(([residential,commercial,industrial,towers,roads,nature,citizens])=>{
+    loadAssetSet(LOCAL_ASSETS.towers),loadAssetSet(LOCAL_ASSETS.roads),loadAssetSet(LOCAL_ASSETS.nature)
+  ]).then(([residential,commercial,industrial,towers,roads,nature])=>{
     const district=new THREE.Group();district.name='Built From Kenney Packs';city.add(district);
-    const worldR=radius, coreR=Math.min(2.8+lvl*.32,5.1);
-    // Kenney Starter Kit roads are modular 1x1 tiles. Build a true snapped
-    // network: every tile shares the same grid spacing, and intersections
-    // replace straight tiles at crossings instead of being stacked on top.
+    const worldR=radius;
     const rg=new THREE.Group();rg.name='Road Network';district.add(rg);
-    const road=roads[0], cross=roads[2]||road;
+    // Roads are a modular 1x1 Kenney system. Keep every connection on the
+    // same grid and reserve the blocks between roads exclusively for buildings.
     const tile=2.18;
-    const half=Math.max(2,Math.floor((worldR*1.55)/tile));
-    const span=half*tile;
-    const key=(x,z)=>`${x}:${z}`;
-    const nodes=new Set();
-    const addTile=(src,x,z,rot=0)=>{
-      const m=cloneKenney(src);
-      m.scale.setScalar(tile);
-      m.rotation.y=rot;
-      m.position.set(x,.035,z);
-      rg.add(m);
+    const roadLines=[-tile*2,0,tile*2];
+    const span=tile*3;
+    const addRoad=(src,x,z,rot=0)=>{
+      const m=cloneKenney(src);m.scale.setScalar(tile);m.rotation.y=rot;m.position.set(x,.035,z);rg.add(m);
     };
-    // Two connected arterial lines plus a compact local grid.
-    const xs=[];for(let x=-half;x<=half;x++)xs.push(x*tile);
-    const zs=[];for(let z=-half;z<=half;z++)zs.push(z*tile);
-    const horizontal=[-tile*2,0,tile*2];
-    const vertical=[-tile*2,0,tile*2];
-    horizontal.forEach(z=>{
-      for(let x=-span;x<=span;x+=tile){nodes.add(key(Math.round(x/tile),Math.round(z/tile)));}
-    });
-    vertical.forEach(x=>{
-      for(let z=-span;z<=span;z+=tile){nodes.add(key(Math.round(x/tile),Math.round(z/tile)));}
-    });
-    // Place one intersection at every crossing and straight modules between.
-    horizontal.forEach(z=>{
+    roadLines.forEach(z=>{
       for(let x=-span;x<=span;x+=tile){
-        const crossing=vertical.some(v=>Math.abs(v-x)<.01);
-        if(!crossing)addTile(road,x,z,Math.PI/2);
+        const crossing=roadLines.some(v=>Math.abs(v-x)<.01);
+        if(!crossing)addRoad(roads[0],x,z,0);
       }
     });
-    vertical.forEach(x=>{
+    roadLines.forEach(x=>{
       for(let z=-span;z<=span;z+=tile){
-        const crossing=horizontal.some(h=>Math.abs(h-z)<.01);
-        if(!crossing)addTile(road,x,z,0);
+        const crossing=roadLines.some(v=>Math.abs(v-z)<.01);
+        if(!crossing)addRoad(roads[0],x,z,Math.PI/2);
       }
     });
-    horizontal.forEach(z=>vertical.forEach(x=>addTile(cross,x,z,0)));
-    // Short feeder roads use the same orientation as the connected arterial grid.
-    for(const z of [-tile*4,tile*4]){
-      for(let x=-tile*2;x<=tile*2;x+=tile)addTile(road,x,z,Math.PI/2);
-    }
-    for(const x of [-tile*4,tile*4]){
-      for(let z=-tile*2;z<=tile*2;z+=tile)addTile(road,x,z,0);
-    }
+    roadLines.forEach(z=>roadLines.forEach(x=>addRoad(roads[2]||roads[0],x,z,0)));
 
-    // Residential growth uses actual Starter Kit buildings, not primitive boxes.
+    // Build a set of genuine city blocks. No building placement is allowed on
+    // a road line; lots are generated inside the four inner blocks with fixed
+    // setbacks, producing streets -> sidewalks -> lots instead of random piles.
+    const blocks=[
+      {x0:-3.82,x1:-.54,z0:-3.82,z1:-.54},
+      {x0:.54,x1:3.82,z0:-3.82,z1:-.54},
+      {x0:-3.82,x1:-.54,z0:.54,z1:3.82},
+      {x0:.54,x1:3.82,z0:.54,z1:3.82}
+    ];
+    const lots=[];
+    blocks.forEach((b,bi)=>{
+      const cols=bi===0||bi===3?3:2, rows=3;
+      for(let r=0;r<rows;r++)for(let col=0;col<cols;col++){
+        const x=b.x0+(col+.5)*(b.x1-b.x0)/cols;
+        const z=b.z0+(r+.5)*(b.z1-b.z0)/rows;
+        lots.push([x,z,bi]);
+      }
+    });
+    const shuffle=(arr)=>{for(let i=arr.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}return arr;};
+    const homeLots=shuffle(lots.slice()).slice(0,Math.min(lots.length,8+lvl*2));
     const homes=new THREE.Group();homes.name='Residential';district.add(homes);
-    placeSpacedKenney(homes,residential,rng,Math.min(28,8+lvl*2),{x0:-worldR*.9,x1:worldR*.9,z0:-worldR*.9,z1:worldR*.9},{min:.72,max:.98},.95,.04);
+    homeLots.forEach((lot,i)=>{
+      const src=residential[Math.floor(rng()*residential.length)],b=cloneKenney(src);
+      b.scale.setScalar(.54+rng()*.12);b.rotation.y=(rng()>.5?Math.PI:0)+(rng()>.72?Math.PI/2:0);
+      b.position.set(lot[0],.04,lot[1]);homes.add(b);
+    });
 
-    // Commercial core grows vertically as the city levels up.
-    if(lvl>=2){const shops=new THREE.Group();shops.name='Commercial';district.add(shops);placeSpacedKenney(shops,commercial,rng,Math.min(12,2+lvl),{x0:-coreR,x1:coreR,z0:-coreR,z1:coreR},{min:.62,max:.86},1.15,.045);}
-    if(lvl>=5&&towers.length){const skyline=new THREE.Group();skyline.name='Downtown Skyline';district.add(skyline);placeSpacedKenney(skyline,towers,rng,Math.min(4,1+Math.floor(lvl/2)),{x0:-coreR*.8,x1:coreR*.8,z0:-coreR*.8,z1:coreR*.8},{min:.55,max:.72},1.4,.045);}
-
-    // Industrial district stays physically separated from the residential core.
-    if(lvl>=3){const factories=new THREE.Group();factories.name='Industrial';district.add(factories);placeSpacedKenney(factories,industrial,rng,Math.min(10,2+lvl),{x0:-worldR*.92,x1:-worldR*.45,z0:-worldR*.72,z1:worldR*.72},{min:.58,max:.82},1.25,.045);}
-
-    // Real Kenney starter-kit green pieces fill open space.
+    if(lvl>=2){
+      const shops=new THREE.Group();shops.name='Commercial';district.add(shops);
+      const shopLots=[lots[2],lots[4],lots[7],lots[9]].filter(Boolean).slice(0,Math.min(2+lvl,4));
+      shopLots.forEach((lot,i)=>{const b=cloneKenney(commercial[(i+seed)%commercial.length]);b.scale.setScalar(.55);b.rotation.y=(i%4)*Math.PI/2;b.position.set(lot[0],.045,lot[1]);shops.add(b);});
+    }
+    if(lvl>=5&&towers.length){
+      const skyline=new THREE.Group();skyline.name='Downtown Skyline';district.add(skyline);
+      // Towers occupy the back corners of blocks, never road tiles.
+      [[-2.65,-2.65],[2.65,-2.65],[-2.65,2.65],[2.65,2.65]].slice(0,Math.min(1+Math.floor(lvl/2),4)).forEach((pos,i)=>{
+        const b=cloneKenney(towers[(i+seed)%towers.length]);b.scale.setScalar(.42);b.rotation.y=(i%4)*Math.PI/2;b.position.set(pos[0],.045,pos[1]);skyline.add(b);
+      });
+    }
+    if(lvl>=3){
+      const factories=new THREE.Group();factories.name='Industrial';district.add(factories);
+      // Industrial buildings are kept in a dedicated edge yard, away from
+      // residential lots and the main road corridors.
+      const industrialLots=[[-5.65,-2.0],[-5.65,0.1],[-5.65,2.2],[-4.95,2.9]];
+      industrialLots.slice(0,Math.min(2+Math.floor(lvl/2),4)).forEach((pos,i)=>{
+        const b=cloneKenney(industrial[(i+seed)%industrial.length]);b.scale.setScalar(.40);b.rotation.y=(i%2)*Math.PI/2;b.position.set(pos[0],.04,pos[1]);factories.add(b);
+      });
+    }
     const green=new THREE.Group();green.name='Green Space';district.add(green);
     const parks=Math.min(4,1+Math.floor(lvl/2));
-    for(let p=0;p<parks;p++){const cx=(p%2?1:-1)*worldR*.47,cz=(p<2?-1:1)*worldR*.45;for(let i=0;i<4+lvl;i++){const t=cloneKenney(nature[Math.floor(rng()*nature.length)]);t.scale.setScalar(.48+rng()*.32);t.position.set(cx+(rng()-.5)*2.5,.035,cz+(rng()-.5)*1.9);t.rotation.y=rng()*Math.PI*2;green.add(t);}}
-
-    // Citizens are added by the shared ambient pedestrian system below.
-    // Keeping one system prevents duplicate/stuck characters in the city centre.
+    const parkSpots=[[-1.35,-1.35],[1.35,-1.35],[-1.35,1.35],[1.35,1.35]];
+    for(let p=0;p<parks;p++){
+      const [cx,cz]=parkSpots[p];
+      for(let i=0;i<3+Math.floor(lvl/2);i++){
+        const t=cloneKenney(nature[Math.floor(rng()*nature.length)]);t.scale.setScalar(.30+rng()*.18);t.position.set(cx+(rng()-.5)*1.0,.035,cz+(rng()-.5)*1.0);t.rotation.y=rng()*Math.PI*2;green.add(t);
+      }
+    }
   }).catch(err=>console.warn('Local Kenney assets failed to load',err));
 }
 
@@ -749,38 +761,36 @@ function addAmbientCitizens(group,c){
   const rng=seeded(hashCity(`${c.name}:citizens`));
   const people=new THREE.Group();people.name='Citizens';group.add(people);
   loadAssetSet(LOCAL_ASSETS.citizens).then(models=>{
-    // Small, sparse pedestrians: enough to make the city feel alive without
-    // turning the map into a crowd. Population affects the count.
-    const count=Math.min(14,3+Math.floor(Math.sqrt(Math.max(1,c.pop||0)/80000)));
-    const paths=[
-      [-5.0,0.0,5.0,0.0], [0.0,-4.4,0.0,4.4],
-      [-4.2,-3.4,4.2,-3.4], [-4.2,3.4,4.2,3.4],
-      [-3.8,-3.8,3.8,3.8], [3.8,-3.8,-3.8,3.8]
-    ];
+    // Population ratio: approximately one visible citizen per 10,000 people.
+    // A small upper bound protects low-end phones while preserving the ratio
+    // for normal city populations.
+    const count=Math.max(1,Math.min(60,Math.round(Math.max(1,c.pop||0)/10000)));
+    const roads=[-4.36,0,4.36];
+    const paths=[];
+    roads.forEach(z=>paths.push({x0:-6.45,z0:z,x1:6.45,z1:z}));
+    roads.forEach(x=>paths.push({x0:x,z0:-6.45,x1:x,z1:6.45}));
     for(let i=0;i<count;i++){
       const p=cloneKenney(models[Math.floor(rng()*models.length)]);
-      // Mini Characters are deliberately tiny relative to buildings.
-      p.scale.setScalar(.085+rng()*.025);
-      const path=paths[i%paths.length];
-      const t=rng();
-      let x=path[0]+(path[2]-path[0])*t;
-      let z=path[1]+(path[3]-path[1])*t;
-      // Slight offset keeps pedestrians from standing directly on one another.
-      x+= (rng()-.5)*.24; z+=(rng()-.5)*.24;
-      p.position.set(x,.025,z);
-      p.userData.walkX=x;
-      p.userData.walkZ=z;
-      p.userData.walkTX=path[2];
-      p.userData.walkTZ=path[3];
-      p.userData.walkPath=path;
-      p.userData.walkSpeed=.00075+rng()*.00045;
-      p.userData.walkPhase=rng();
-      p.rotation.y=Math.atan2(path[2]-path[0],path[3]-path[1]);
+      // Deliberately much smaller than the previous version.
+      p.scale.setScalar(.052+rng()*.012);
+      const path=paths[Math.floor(rng()*paths.length)];
+      const forward=rng()>.5;
+      const t=.08+rng()*.84;
+      const sx=path.x0+(path.x1-path.x0)*(forward?t:1-t);
+      const sz=path.z0+(path.z1-path.z0)*(forward?t:1-t);
+      const tx=forward?path.x1:path.x0;
+      const tz=forward?path.z1:path.z0;
+      p.position.set(sx,.018,sz);
+      p.userData.walkTX=tx;p.userData.walkTZ=tz;p.userData.walkPath=path;
+      p.userData.walkForward=forward;p.userData.walkSpeed=.0010+rng()*.00065;
+      p.userData.lastWalkTime=performance.now();
+      p.rotation.y=Math.atan2(tx-sx,tz-sz);
       people.add(p);
     }
   }).catch(err=>console.warn('Citizen assets failed to load',err));
   return people;
 }
+
 function buildCityScene(host,c,opts={}){
   if(!host||!c)return null;
   const width=host.clientWidth||640,height=host.clientHeight||320;
