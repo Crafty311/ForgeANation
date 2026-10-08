@@ -679,22 +679,22 @@ function addKenneyCityAssets(group,seed,level,opts={}){
     horizontal.forEach(z=>{
       for(let x=-span;x<=span;x+=tile){
         const crossing=vertical.some(v=>Math.abs(v-x)<.01);
-        if(!crossing)addTile(road,x,z,0);
+        if(!crossing)addTile(road,x,z,Math.PI/2);
       }
     });
     vertical.forEach(x=>{
       for(let z=-span;z<=span;z+=tile){
         const crossing=horizontal.some(h=>Math.abs(h-z)<.01);
-        if(!crossing)addTile(road,x,z,Math.PI/2);
+        if(!crossing)addTile(road,x,z,0);
       }
     });
     horizontal.forEach(z=>vertical.forEach(x=>addTile(cross,x,z,0)));
-    // Short feeder roads connect the arterial grid to the outer neighbourhoods.
+    // Short feeder roads use the same orientation as the connected arterial grid.
     for(const z of [-tile*4,tile*4]){
-      for(let x=-tile*2;x<=tile*2;x+=tile)addTile(road,x,z,0);
+      for(let x=-tile*2;x<=tile*2;x+=tile)addTile(road,x,z,Math.PI/2);
     }
     for(const x of [-tile*4,tile*4]){
-      for(let z=-tile*2;z<=tile*2;z+=tile)addTile(road,x,z,Math.PI/2);
+      for(let z=-tile*2;z<=tile*2;z+=tile)addTile(road,x,z,0);
     }
 
     // Residential growth uses actual Starter Kit buildings, not primitive boxes.
