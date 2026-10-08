@@ -680,268 +680,179 @@ function placeSpacedKenney(group,models,rng,count,zone,scaleRange={min:.7,max:1.
     }
   }
 }
-function cityGrid(radius){
+function cityGrid(radius=6.4){
   const step=2.2;
-  const lines=[-4.4,-2.2,0,2.2,4.4].filter(v=>Math.abs(v)<=radius+.01);
+  const lines=[-4.4,-2.2,0,2.2,4.4];
   const blocks=[];
-  for(let ix=0;ix<lines.length-1;ix++)for(let iz=0;iz<lines.length-1;iz++){
-    const x0=lines[ix]+.72,x1=lines[ix+1]-.72,z0=lines[iz]+.72,z1=lines[iz+1]-.72;
-    if(x1>x0&&z1>z0)blocks.push({x0,x1,z0,z1,cx:(x0+x1)/2,cz:(z0+z1)/2,ix,iz});
+  for(let ix=0;ix<lines.length-1;ix++) for(let iz=0;iz<lines.length-1;iz++){
+    const x0=lines[ix]+1.14,x1=lines[ix+1]-1.14,z0=lines[iz]+1.14,z1=lines[iz+1]-1.14;
+    if(x1>x0&&z1>z0) blocks.push({x0,x1,z0,z1,cx:(x0+x1)/2,cz:(z0+z1)/2,ix,iz});
   }
   return {step,lines,blocks};
 }
 function placeInBlocks(group,models,rng,blocks,count,scaleMin,scaleMax,category){
-  if(!models.length||!blocks.length)return;
-  const used=[];
-  const shuffled=blocks.slice().sort(()=>rng()-.5);
-  for(let i=0;i<count;i++){
-    let placed=false;
-    for(let a=0;a<shuffled.length&&!placed;a++){
-      const b=shuffled[(i+a)%shuffled.length];
-      const src=models[Math.floor(rng()*models.length)];
-      const obj=cloneKenney(src); const scale=scaleMin+rng()*(scaleMax-scaleMin); obj.scale.setScalar(scale); obj.rotation.y=Math.floor(rng()*4)*Math.PI/2;
-      const bb=new THREE.Box3().setFromObject(obj),size=new THREE.Vector3();bb.getSize(size);
-      const margin=.10, hw=Math.max(.2,size.x/2+margin),hd=Math.max(.2,size.z/2+margin);
-      const xmin=b.x0+hw,xmax=b.x1-hw,zmin=b.z0+hd,zmax=b.z1-hd;
-      if(xmin>xmax||zmin>zmax)continue;
-      const x=xmin+rng()*(xmax-xmin),z=zmin+rng()*(zmax-zmin);
-      let clear=true;for(const q of used){if(Math.hypot(q.x-x,q.z-z)<q.r+Math.max(hw,hd)+.12){clear=false;break;}}
-      if(!clear)continue;
-      obj.position.set(x,.045,z);group.add(obj);used.push({x,z,r:Math.max(hw,hd)});placed=true;
-    }
+  if(!models.length||!blocks.length||count<=0)return;
+  const chosen=blocks.slice();
+  // Deterministic shuffle without changing the city every render.
+  for(let i=chosen.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[chosen[i],chosen[j]]=[chosen[j],chosen[i]];}
+  let placed=0;
+  for(const b of chosen){
+    if(placed>=count)break;
+    const src=models[Math.floor(rng()*models.length)];
+    const obj=cloneKenney(src);
+    const scale=scaleMin+rng()*(scaleMax-scaleMin);obj.scale.setScalar(scale);
+    obj.rotation.y=Math.floor(rng()*4)*Math.PI/2;
+    const bb=new THREE.Box3().setFromObject(obj),size=new THREE.Vector3();bb.getSize(size);
+    const hw=Math.max(.18,size.x/2),hd=Math.max(.18,size.z/2);
+    const xmin=b.x0+hw+.08,xmax=b.x1-hw-.08,zmin=b.z0+hd+.08,zmax=b.z1-hd-.08;
+    if(xmin>xmax||zmin>zmax)continue;
+    // Put buildings toward the block interior, never in the road corridor.
+    const x=xmin+(xmax-xmin)*(.22+rng()*.56),z=zmin+(zmax-zmin)*(.22+rng()*.56);
+    obj.position.set(x,.045,z);obj.userData.cityCategory=category;group.add(obj);placed++;
   }
 }
 function addKenneyCityAssets(group,seed,level,opts={}){
-  const rng=seeded(seed),lvl=Math.max(1,Math.min(10,level)),radius=opts.radius||6.4;
+  const rng=seeded(seed),lvl=Math.max(1,Math.min(10,level)),national=!!opts.national;
   const city=new THREE.Group();city.name='Kenney City Districts';group.add(city);
   Promise.all([
     loadAssetSet(LOCAL_ASSETS.residential),loadAssetSet(LOCAL_ASSETS.commercial),loadAssetSet(LOCAL_ASSETS.industrial),
     loadAssetSet(LOCAL_ASSETS.towers),loadAssetSet(LOCAL_ASSETS.roads),loadAssetSet(LOCAL_ASSETS.nature)
   ]).then(([residential,commercial,industrial,towers,roads,nature])=>{
     const district=new THREE.Group();district.name='Built From Kenney Packs';city.add(district);
-    const grid=cityGrid(radius);
+    const grid=cityGrid();
     const rg=new THREE.Group();rg.name='Road Network';district.add(rg);
-    const straight=roads.find(x=>x.endsWith('road-straight.glb'))||roads[0];
-    const intersection=roads.find(x=>x.endsWith('road-intersection.glb'))||roads[0];
-    const roadScale=2.2;
-    const lines=grid.lines;
-    if(!opts.national){
-      // A clean orthogonal street grid. Every tile is exactly one module wide;
-      // intersections replace straight tiles at crossings, so nothing stacks.
-      for(const z of lines)for(const x of lines){
-        const m=cloneKenney(intersection);m.scale.setScalar(roadScale);m.position.set(x,.035,z);rg.add(m);
+    if(!national){
+      const straight=roads.find(x=>x.endsWith('/road-straight.glb'))||roads.find(x=>x.endsWith('road-straight.glb'))||roads[0];
+      const intersection=roads.find(x=>x.endsWith('/road-intersection.glb'))||roads.find(x=>x.endsWith('road-intersection.glb'))||roads[0];
+      const roadScale=2.2;
+      // Kenney straight road is N/S in its native orientation. Each tile is one grid cell.
+      for(const z of grid.lines) for(const x of grid.lines){
+        const m=cloneKenney(intersection);m.scale.setScalar(roadScale);m.position.set(x,.032,z);rg.add(m);
       }
-      for(const z of lines)for(const x=-4.4;x<=4.4+.01;x+=roadScale){
-        if(lines.some(v=>Math.abs(v-x)<.01))continue;
-        const m=cloneKenney(straight);m.scale.setScalar(roadScale);m.rotation.y=Math.PI/2;m.position.set(x,.035,z);rg.add(m);
+      for(const x of grid.lines) for(let z=-3.3;z<=3.3+.01;z+=roadScale){
+        const m=cloneKenney(straight);m.scale.setScalar(roadScale);m.position.set(x,.032,z);rg.add(m);
       }
-      for(const x of lines)for(const z=-4.4;z<=4.4+.01;z+=roadScale){
-        if(lines.some(v=>Math.abs(v-z)<.01))continue;
-        const m=cloneKenney(straight);m.scale.setScalar(roadScale);m.position.set(x,.035,z);rg.add(m);
+      for(const z of grid.lines) for(let x=-3.3;x<=3.3+.01;x+=roadScale){
+        const m=cloneKenney(straight);m.scale.setScalar(roadScale);m.rotation.y=Math.PI/2;m.position.set(x,.032,z);rg.add(m);
       }
-      // Extra road investment extends the connected network toward the city edge.
-      const extra=Math.max(0,Math.min(4,Math.round((opts.roadLinks||2)-5)));
-      for(let e=0;e<extra;e++){
-        const edge=6.6+e*2.2;
-        for(const z of [-2.2,2.2]){const m=cloneKenney(straight);m.scale.setScalar(roadScale);m.position.set(edge,.035,z);rg.add(m);}
-        for(const x of [-2.2,2.2]){const m=cloneKenney(straight);m.scale.setScalar(roadScale);m.rotation.y=Math.PI/2;m.position.set(x,.035,edge);rg.add(m);}
-      }
-    } else rg.visible=false;
-    // Buildings are generated from the block interiors, never from world-wide random coordinates.
-    const commercialBlocks=grid.blocks.filter(b=>b.ix>=1&&b.ix<=2&&b.iz>=1&&b.iz<=2);
-    const industrialBlocks=grid.blocks.filter(b=>b.ix<=1&&b.iz>=2);
-    const towerBlocks=grid.blocks.filter(b=>b.ix>=2&&b.iz<=1);
-    const reserved=new Set([...commercialBlocks,...industrialBlocks,...towerBlocks].map(b=>`${b.ix}:${b.iz}`));(opts.blockedSlots||[]).forEach(slot=>{const b=grid.blocks[Number(slot)%grid.blocks.length];if(b)reserved.add(`${b.ix}:${b.iz}`);});
-    const residentialBlocks=grid.blocks.filter(b=>!reserved.has(`${b.ix}:${b.iz}`));
-    const homes=new THREE.Group();homes.name='Residential Blocks';district.add(homes);
-    const homeCount=opts.national?Math.min(5,Math.max(2,lvl)):Math.min(28,Math.max(6,8+lvl*2));
-    placeInBlocks(homes,residential,rng,residentialBlocks.length?residentialBlocks:grid.blocks,homeCount,opts.national?.32:.42,opts.national?.42:.62,'residential');
-    if(lvl>=2){const shops=new THREE.Group();shops.name='Commercial Blocks';district.add(shops);placeInBlocks(shops,commercial,rng,opts.national?grid.blocks:commercialBlocks,opts.national?Math.min(2,Math.floor(lvl/2)):Math.min(10,2+lvl),opts.national?.30:.42,opts.national?.40:.58,'commercial');}
-    if(lvl>=3&&!opts.national){const factories=new THREE.Group();factories.name='Industrial Blocks';district.add(factories);placeInBlocks(factories,industrial,rng,industrialBlocks,Math.min(8,2+lvl),.42,.55,'industrial');}
-    if(lvl>=5&&towers.length){const skyline=new THREE.Group();skyline.name='Downtown Skyline';district.add(skyline);placeInBlocks(skyline,towers,rng,opts.national?grid.blocks:towerBlocks,opts.national?1:Math.min(4,1+Math.floor(lvl/2)),opts.national?.28:.40,opts.national?.34:.50,'tower');}
-    const green=new THREE.Group();green.name='Green Spaces';district.add(green);
-    const parks=opts.national?0:Math.min(3,1+Math.floor(lvl/3));
-    grid.blocks.filter(b=>b.ix<=1&&b.iz<=1).slice(0,parks).forEach(b=>{for(let i=0;i<3+lvl;i++){const t=cloneKenney(nature[Math.floor(rng()*nature.length)]);t.scale.setScalar(.32+rng()*.18);t.position.set(b.cx+(rng()-.5)*.75,.035,b.cz+(rng()-.5)*.65);t.rotation.y=rng()*Math.PI*2;green.add(t);}});
+    }
+
+    // Reserve functional/player buildings first. Everything procedural is then fitted into remaining blocks.
+    const blocked=new Set((opts.blockedSlots||[]).map(v=>Number(v)).filter(Number.isFinite).map(v=>`${Math.floor(v)%16}`));
+    const key=b=>`${b.ix*4+b.iz}`;
+    const all=grid.blocks;
+    const free=all.filter(b=>!blocked.has(key(b)));
+    const residentialBlocks=free.filter(b=>(b.ix===0||b.ix===3)&&(b.iz===0||b.iz===1||b.iz===2||b.iz===3));
+    const commercialBlocks=free.filter(b=>b.ix===1||b.iz===1);
+    const industrialBlocks=free.filter(b=>b.ix===0&&b.iz>=2 || b.ix===3&&b.iz>=2);
+    const towerBlocks=free.filter(b=>b.ix===1&&b.iz===1 || b.ix===2&&b.iz===2);
+
+    if(!national){
+      const homes=new THREE.Group();homes.name='Residential District';district.add(homes);
+      placeInBlocks(homes,residential,rng,residentialBlocks.length?residentialBlocks:free,Math.min(10,5+Math.floor(lvl*1.4)),.42,.58,'residential');
+      if(lvl>=2){const shops=new THREE.Group();shops.name='Commercial District';district.add(shops);placeInBlocks(shops,commercial,rng,commercialBlocks.length?commercialBlocks:free,Math.min(6,1+lvl),.40,.55,'commercial');}
+      if(lvl>=3){const factories=new THREE.Group();factories.name='Industrial District';district.add(factories);placeInBlocks(factories,industrial,rng,industrialBlocks.length?industrialBlocks:free,Math.min(4,Math.floor(lvl/2)),.40,.52,'industrial');}
+      if(lvl>=5&&towers.length){const skyline=new THREE.Group();skyline.name='Downtown';district.add(skyline);placeInBlocks(skyline,towers,rng,towerBlocks.length?towerBlocks:free,Math.min(2,1+Math.floor((lvl-5)/2)),.38,.46,'tower');}
+      const green=new THREE.Group();green.name='Parks';district.add(green);
+      const parkBlocks=free.filter(b=>b.ix===0&&b.iz===0||b.ix===3&&b.iz===3).slice(0,Math.min(2,1+Math.floor(lvl/5)));
+      parkBlocks.forEach(b=>{const p=cloneKenney(nature[rngInt(rng,nature.length)]);p.scale.setScalar(.55);p.position.set(b.cx,.035,b.cz);green.add(p);});
+    } else {
+      // National view is intentionally an abstracted city footprint, not a second full street map.
+      const footprint=new THREE.Group();footprint.name='City Footprint';district.add(footprint);
+      const miniBlocks=free.slice(0,Math.min(8,2+lvl));
+      placeInBlocks(footprint,residential,rng,miniBlocks,Math.min(5,1+lvl),.28,.36,'national-residential');
+      if(lvl>=3)placeInBlocks(footprint,commercial,rng,miniBlocks.slice(2),Math.min(2,Math.floor(lvl/3)),.27,.34,'national-commercial');
+      if(lvl>=5&&towers.length)placeInBlocks(footprint,towers,rng,miniBlocks.slice(1,3),1,.22,.28,'national-tower');
+    }
   }).catch(err=>console.warn('Local Kenney city assets failed to load',err));
 }
-function addCozyProjectVisuals(group,c){
-  // Retired: the old procedural boxes conflicted with the Kenney visual language.
-  // Existing projects remain represented by the real Kenney city districts below.
-}
-
+function rngInt(rng,n){return Math.max(0,Math.min(n-1,Math.floor(rng()*n)));}
+function addCozyProjectVisuals(group,c){ }
 function addBuiltStructures(group,c){
- const buildings=c.buildings||[];if(!buildings.length)return;
- const root=new THREE.Group();root.name='Player Built District';group.add(root);
- const map={cottage:LOCAL_ASSETS.residential,apartment:LOCAL_ASSETS.commercial,shop:LOCAL_ASSETS.commercial,cafe:LOCAL_ASSETS.commercial,market:LOCAL_ASSETS.commercial,school:LOCAL_ASSETS.commercial,clinic:LOCAL_ASSETS.commercial,museum:LOCAL_ASSETS.commercial,workshop:LOCAL_ASSETS.industrial,warehouse:LOCAL_ASSETS.industrial,station:LOCAL_ASSETS.commercial,stadium:LOCAL_ASSETS.commercial,university:LOCAL_ASSETS.commercial};
- const loads=[...new Set(Object.values(map).flat())];
- loadAssetSet(loads).then(loaded=>{
-   const byUrl=new Map(loads.map((u,i)=>[u,loaded[i]]));
-   const grid=cityGrid(6.4); const slots=grid.blocks.slice();
-   buildings.forEach((b,idx)=>{
-     const urls=map[b.id],src=urls?.map(u=>byUrl.get(u)).find(Boolean);if(!src)return;
-     const block=slots[(Number.isFinite(b.slot)?b.slot:idx)%slots.length];
-     const g=cloneKenney(src);const scale=b.id==='cottage'?.48:b.id==='apartment'?.44:b.id==='stadium'?.40:b.id==='university'?.42:.46;
-     g.scale.setScalar(scale);g.rotation.y=(idx%4)*Math.PI/2;
-     const bb=new THREE.Box3().setFromObject(g),size=new THREE.Vector3();bb.getSize(size);
-     const x=clamp(block.cx,block.x0+size.x/2+.08,block.x1-size.x/2-.08);
-     const z=clamp(block.cz,block.z0+size.z/2+.08,block.z1-size.z/2-.08);
-     g.position.set(x,.045,z);g.userData.buildingId=b.id;root.add(g);
-   });
- }).catch(err=>console.warn('Built structure assets failed',err));
+  const buildings=c.buildings||[];if(!buildings.length)return;
+  const map={cottage:LOCAL_ASSETS.residential,apartment:LOCAL_ASSETS.commercial,shop:LOCAL_ASSETS.commercial,cafe:LOCAL_ASSETS.commercial,market:LOCAL_ASSETS.commercial,school:LOCAL_ASSETS.commercial,clinic:LOCAL_ASSETS.commercial,museum:LOCAL_ASSETS.commercial,workshop:LOCAL_ASSETS.industrial,warehouse:LOCAL_ASSETS.industrial,station:LOCAL_ASSETS.commercial,stadium:LOCAL_ASSETS.commercial,university:LOCAL_ASSETS.commercial};
+  const loads=[...new Set(Object.values(map).flat())];
+  loadAssetSet(loads).then(loaded=>{
+    const byUrl=new Map(loads.map((u,i)=>[u,loaded[i]]));const grid=cityGrid();const root=new THREE.Group();root.name='Player Built District';group.add(root);
+    buildings.forEach((b,idx)=>{const urls=map[b.id],src=urls?.map(u=>byUrl.get(u)).find(Boolean);if(!src)return;const block=grid.blocks[(Number.isFinite(b.slot)?b.slot:idx)%grid.blocks.length];const g=cloneKenney(src);g.scale.setScalar(b.id==='stadium'?.38:b.id==='university'?.40:.44);g.rotation.y=(idx%4)*Math.PI/2;const bb=new THREE.Box3().setFromObject(g),size=new THREE.Vector3();bb.getSize(size);g.position.set(clamp(block.cx,block.x0+size.x/2+.06,block.x1-size.x/2-.06),.045,clamp(block.cz,block.z0+size.z/2+.06,block.z1-size.z/2-.06));root.add(g);});
+  }).catch(err=>console.warn('Built structure assets failed',err));
 }
 function addAmbientCitizens(group,c,opts={}){
-  const people=new THREE.Group();people.name='Citizens';group.add(people);
-  if(opts.national)return people;
+  const people=new THREE.Group();people.name='Citizens';group.add(people);if(opts.national)return people;
+  const pop=Math.max(0,Number(c.pop)||0);const count=Math.floor(pop/10000);if(count<=0)return people;
   const rng=seeded(hashCity(`${c.name}:citizens:${c.citySeed||0}`));
   loadAssetSet(LOCAL_ASSETS.citizens).then(models=>{
-    const count=Math.max(1,Math.round(Math.max(1,c.pop||0)/10000));
-    const lines=[-4.4,-2.2,0,2.2,4.4];
-    const paths=[];for(const z of lines)paths.push([ -4.4,z,4.4,z ]);for(const x of lines)paths.push([ x,-4.4,x,4.4 ]);
+    // Citizens are distributed across the same snapped streets as the road tiles.
+    const lines=[-4.4,-2.2,0,2.2,4.4],paths=[];for(const z of lines)paths.push({a:[-3.3,z],b:[3.3,z]});for(const x of lines)paths.push({a:[x,-3.3],b:[x,3.3]});
     for(let i=0;i<count;i++){
-      const p=cloneKenney(models[i%models.length]);p.scale.setScalar(.045+rng()*.008);
-      const path=paths[i%paths.length];const t=rng();const reverse=rng()>.5;
-      const sx=reverse?path[2]:path[0],sz=reverse?path[3]:path[1],tx=reverse?path[0]:path[2],tz=reverse?path[1]:path[3];
-      p.position.set(sx+(tx-sx)*t,.03,sz+(tz-sz)*t);p.userData.walkTX=tx;p.userData.walkTZ=tz;p.userData.walkSpeed=.0010+rng()*.0007;p.userData.walkPath=path;p.userData.walkReverse=reverse;p.rotation.y=Math.atan2(tx-sx,tz-sz);people.add(p);
+      const p=cloneKenney(models[i%models.length]);p.scale.setScalar(.018+rng()*.006);const path=paths[i%paths.length];const t=rng();const reverse=rng()>.5;const a=reverse?path.b:path.a,b=reverse?path.a:path.b;p.position.set(a[0]+(b[0]-a[0])*t,.018,a[1]+(b[1]-a[1])*t);p.userData.walkTX=b[0];p.userData.walkTZ=b[1];p.userData.walkPath=path;p.userData.walkSpeed=.018+rng()*.009;p.userData.lastWalkTime=performance.now();p.rotation.y=Math.atan2(b[0]-a[0],b[1]-a[1]);people.add(p);
     }
-  }).catch(err=>console.warn('Citizen assets failed to load',err));
-  return people;
+  }).catch(err=>console.warn('Citizen assets failed to load',err));return people;
 }
 function buildCityScene(host,c,opts={}){
-  if(!host||!c)return null;
-  const width=host.clientWidth||640,height=host.clientHeight||320;
-  const scene=new THREE.Scene(),style=cityStyle(c);scene.background=new THREE.Color(style.ground);
-  const camera=new THREE.PerspectiveCamera(32,width/height,.1,100);camera.position.set(9.5,7.8,11.5);camera.lookAt(0,1.2,0);
-  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});renderer.setPixelRatio(Math.min(1.1,window.devicePixelRatio||1));renderer.setSize(width,height,false);renderer.shadowMap.enabled=false;host.appendChild(renderer.domElement);
-  scene.add(new THREE.HemisphereLight(0xb8dce4,0x10252c,1.75));const sun=new THREE.DirectionalLight(0xffe2ad,2.1);sun.position.set(5,10,4);sun.castShadow=true;scene.add(sun);
-  const group=new THREE.Group();scene.add(group);
-  const ground=new THREE.Mesh(new THREE.PlaneGeometry(22,18),new THREE.MeshStandardMaterial({color:style.ground,roughness:1}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;group.add(ground);
-  const lvl=Math.max(1,Math.min(10,c.level||1)),seed=c.citySeed||citySeed(c);
-  addKenneyCityAssets(group,seed,lvl,{radius:6.4,roadLinks:c.roads||2,blockedSlots:(c.buildings||[]).map(b=>Number(b.slot)||0)});
-  addBuiltStructures(group,c);
-  addCozyProjectVisuals(group,c);
-  addAmbientCitizens(group,c);
-  let dragging=false,lastX=0,lastY=0;renderer.domElement.style.touchAction='none';renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;renderer.domElement.setPointerCapture?.(e.pointerId)});renderer.domElement.addEventListener('pointerup',e=>{dragging=false;renderer.domElement.releasePointerCapture?.(e.pointerId)});renderer.domElement.addEventListener('pointercancel',()=>dragging=false);renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;group.rotation.y+=(e.clientX-lastX)*.008;group.rotation.x=THREE.MathUtils.clamp(group.rotation.x+(e.clientY-lastY)*.004,-.35,.25);lastX=e.clientX;lastY=e.clientY});
-  const rec={renderer,scene,camera,group,host};citySceneRecords.push(rec);return rec;
+  if(!host||!c)return null;const width=host.clientWidth||640,height=host.clientHeight||320;const scene=new THREE.Scene(),style=cityStyle(c);scene.background=new THREE.Color(style.ground);const camera=new THREE.PerspectiveCamera(34,width/height,.1,100);camera.position.set(10,8.5,12);camera.lookAt(0,.45,0);const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false});renderer.setPixelRatio(Math.min(1.2,window.devicePixelRatio||1));renderer.setSize(width,height,false);renderer.outputColorSpace=THREE.SRGBColorSpace;host.appendChild(renderer.domElement);scene.add(new THREE.HemisphereLight(0xc7e4ea,0x14251e,1.9));const sun=new THREE.DirectionalLight(0xffe6bc,2.3);sun.position.set(5,11,5);scene.add(sun);const group=new THREE.Group();scene.add(group);const ground=new THREE.Mesh(new THREE.PlaneGeometry(22,18),new THREE.MeshStandardMaterial({color:style.ground,roughness:1}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;group.add(ground);const lvl=Math.max(1,Math.min(10,c.level||1)),seed=c.citySeed||citySeed(c);addKenneyCityAssets(group,seed,lvl,{radius:6.4,roadLinks:c.roads||2,blockedSlots:(c.buildings||[]).map(b=>Number(b.slot)||0)});addBuiltStructures(group,c);addAmbientCitizens(group,c);let dragging=false,lastX=0,lastY=0;renderer.domElement.style.touchAction='none';renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;renderer.domElement.setPointerCapture?.(e.pointerId)});renderer.domElement.addEventListener('pointerup',e=>{dragging=false});renderer.domElement.addEventListener('pointercancel',()=>dragging=false);renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;group.rotation.y+=(e.clientX-lastX)*.007;group.rotation.x=THREE.MathUtils.clamp(group.rotation.x+(e.clientY-lastY)*.003,-.28,.16);lastX=e.clientX;lastY=e.clientY});const rec={renderer,scene,camera,group,host};citySceneRecords.push(rec);return rec;
 }
-
 function buildNationalScene(host){
-  if(!host||!state.nation)return null;
-  const width=host.clientWidth||900,height=host.clientHeight||470;
-  const scene=new THREE.Scene();
-  scene.background=new THREE.Color(0x0a1c25);
-  scene.fog=new THREE.FogExp2(0x0a1c25,.012);
-  const camera=new THREE.PerspectiveCamera(35,width/height,.1,180);
-  camera.position.set(0,18,18); camera.lookAt(0,0,0);
-  const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
-  renderer.setPixelRatio(Math.min(1.5,devicePixelRatio||1)); renderer.setSize(width,height,false);
-  renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.shadowMap.enabled=true; host.innerHTML=''; host.appendChild(renderer.domElement);
-  scene.add(new THREE.HemisphereLight(0xa6d5df,0x17231e,1.65));
-  const sun=new THREE.DirectionalLight(0xffdfad,1.8); sun.position.set(-8,15,7); sun.castShadow=true; scene.add(sun);
-  const world=new THREE.Group(); scene.add(world);
-
-  const terrain=new THREE.Mesh(new THREE.PlaneGeometry(32,24,1,1),new THREE.MeshStandardMaterial({color:0x355d4d,roughness:1}));
-  terrain.rotation.x=-Math.PI/2; terrain.receiveShadow=true; world.add(terrain);
-
-  // Large geographic regions: forests, farms, hills and water.
-  const rng=seeded(hashCity(state.nation.name+':national-geography'));
-  const landMats=[0x466b54,0x52775a,0x6c7650,0x3e604e];
-  for(let i=0;i<26;i++){
-    const g=new THREE.Group();
-    const w=1.3+rng()*3.6,d=.9+rng()*2.6;
-    const mat=new THREE.MeshStandardMaterial({color:landMats[i%landMats.length],roughness:1});
-    const patch=new THREE.Mesh(new THREE.CircleGeometry(.5,10),mat); patch.scale.set(w,d,1); patch.rotation.x=-Math.PI/2;
-    g.add(patch);g.position.set((rng()-.5)*27,.018,(rng()-.5)*19); world.add(g);
-  }
-  // Deliberately no mountains or rivers on the national map. The country remains a broad, buildable plain so the city network stays visually dominant.
-
-  const roadMat=new THREE.MeshStandardMaterial({color:0x27383c,roughness:.94});
-  const railMat=new THREE.MeshStandardMaterial({color:0x9c8769,roughness:.8});
-  function route(points,width,mat,y=.035){
-    const pts=points.map(p=>new THREE.Vector3(p[0],y,p[1]));
-    for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1],dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);const mesh=new THREE.Mesh(new THREE.BoxGeometry(Math.max(.25,len),.035,width*2),mat);mesh.position.set((a.x+b.x)/2,y,(a.z+b.z)/2);mesh.rotation.y=-Math.atan2(dz,dx);world.add(mesh);}
-  }
-  route([[-12,-2],[-6,-2],[0,-1],[6,0],[12,1]],.09,roadMat);
-  route([[-10,6],[-4,4],[2,1],[8,-3],[12,-6]],.075,roadMat);
-  route([[-10,-7],[-4,-5],[2,-3],[8,0],[12,4]],.035,railMat,.055);
-
-  // Every real city becomes a visible urban footprint on the national map.
-  const cities=state.nation.cities||[];
-  const positions=[];
-  // Place cities with deterministic relaxation so their scaled urban
-  // footprints never visually pile into one another on the national map.
-  const minGap=(a,b)=>2.45+Math.min(1.55,((a.level||1)+(b.level||1))*.075);
-  cities.forEach((c,i)=>{
-    const angle=i*2.399963, rad=i===0?0:2.8+Math.sqrt(i)*2.18;
-    let x=i===0?-1.5:Math.cos(angle)*rad;
-    let z=i===0?-1.5:Math.sin(angle)*rad*.70;
-    x=Math.max(-11.6,Math.min(11.6,x)); z=Math.max(-8.5,Math.min(8.5,z));
-    for(let pass=0;pass<28;pass++){
-      let moved=false;
-      for(let j=0;j<positions.length;j++){
-        const [px,pz]=positions[j],pc=cities[j]; let dx=x-px,dz=z-pz,dist=Math.hypot(dx,dz);
-        const gap=minGap(c,pc);
-        if(dist<gap){
-          if(dist<.001){dx=Math.cos(angle+.8);dz=Math.sin(angle+.8);dist=1;}
-          const push=(gap-dist)*.58;
-          x+=dx/dist*push;z+=dz/dist*push;moved=true;
-        }
-      }
-      x=Math.max(-11.6,Math.min(11.6,x)); z=Math.max(-8.5,Math.min(8.5,z));
-      if(!moved)break;
-    }
-    positions.push([x,z]);
-    const cityGroup=new THREE.Group(); cityGroup.position.set(x,.06,z);
-    const cLvl=Math.max(1,Math.min(10,c.level||1));
-    // The national map uses the same bundled Kenney vocabulary as the city view.
-    // Cities are placed inside their own footprints so national infrastructure can live outside them.
-    addKenneyCityAssets(cityGroup,c.citySeed||citySeed(c),cLvl,{radius:3.1,national:true});
-    cityGroup.scale.setScalar(.38+Math.min(cLvl,8)*.015);
-    world.add(cityGroup);
-    // city glow/marker
-    const ring=new THREE.Mesh(new THREE.RingGeometry(.55,.64,24),new THREE.MeshBasicMaterial({color:i===0?0xe5c36a:0x7bc7cc,transparent:true,opacity:.72,side:THREE.DoubleSide}));
-    ring.rotation.x=-Math.PI/2; ring.position.set(x,.16,z); world.add(ring);
-  });
-
-  // National Store landmarks occupy a separate western/eastern corridor. They never sit on city footprints.
-  const nationalSlots={factory:[-9,-6],railway:[-6,7],airport:[9,6],hospital:[9,-5],stadium:[-8,7],university:[6,8],research:[8,-8],finance:[-8,3]};
-  const assetFor={factory:LOCAL_ASSETS.industrial,railway:LOCAL_ASSETS.industrial,airport:LOCAL_ASSETS.commercial,hospital:LOCAL_ASSETS.commercial,stadium:LOCAL_ASSETS.commercial,university:LOCAL_ASSETS.commercial,research:LOCAL_ASSETS.commercial,finance:LOCAL_ASSETS.commercial};
-  const placedNational=new THREE.Group();placedNational.name='National Infrastructure';world.add(placedNational);
-  const nationalLoads=[...new Set(Object.values(assetFor).flat())];
-  loadAssetSet(nationalLoads).then(loaded=>{
-    const byUrl=new Map(nationalLoads.map((u,i)=>[u,loaded[i]]));
-    const candidates=[[-10,-7],[-7,7],[10,7],[10,-6],[-9,3],[7,-8],[0,9],[0,-9],[-12,0],[12,0]];
-    const cityPos=positions.slice();let cursor=0;
-    const farEnough=(x,z)=>cityPos.every(([cx,cz])=>Math.hypot(x-cx,z-cz)>2.5);
-    Object.entries(nationalSlots).forEach(([id,_])=>{const amount=Number(state.nation.assets?.[id]||0);const urls=assetFor[id];for(let k=0;k<amount;k++){let pos=null;for(let tries=0;tries<candidates.length;tries++){const cnd=candidates[(cursor++)%candidates.length];if(farEnough(cnd[0],cnd[1])){pos=cnd;break;}}if(!pos)continue;const src=byUrl.get(urls[k%urls.length]);if(!src)continue;const g=cloneKenney(src);g.position.set(pos[0]+(k%2)*.9,.045,pos[1]+Math.floor(k/2)*.9);g.rotation.y=((k+id.length)%4)*Math.PI/2;g.scale.setScalar(id==='stadium'?.40:id==='factory'?.48:.43);placedNational.add(g);}});
-  });
-
-  // Interaction: drag to rotate/inspect the whole country.
-  let dragging=false,lastX=0,lastY=0;
-  renderer.domElement.style.touchAction='none';
-  renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;renderer.domElement.setPointerCapture?.(e.pointerId)});
-  renderer.domElement.addEventListener('pointerup',e=>{dragging=false;renderer.domElement.releasePointerCapture?.(e.pointerId)});
-  renderer.domElement.addEventListener('pointercancel',()=>dragging=false);
-  renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;world.rotation.y+=(e.clientX-lastX)*.003;world.rotation.x=THREE.MathUtils.clamp(world.rotation.x+(e.clientY-lastY)*.001,-.12,.12);lastX=e.clientX;lastY=e.clientY});
-  const rec={renderer,scene,camera,group:world,host};
-  citySceneRecords.push(rec); return rec;
+  if(!host||!state.nation)return null;const width=host.clientWidth||900,height=host.clientHeight||470;const scene=new THREE.Scene();scene.background=new THREE.Color(0x0a1c25);const camera=new THREE.PerspectiveCamera(38,width/height,.1,180);camera.position.set(0,19,18);camera.lookAt(0,0,0);const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(1.5,devicePixelRatio||1));renderer.setSize(width,height,false);renderer.outputColorSpace=THREE.SRGBColorSpace;host.innerHTML='';host.appendChild(renderer.domElement);scene.add(new THREE.HemisphereLight(0xa6d5df,0x17231e,1.8));const sun=new THREE.DirectionalLight(0xffdfad,2.0);sun.position.set(-8,15,7);scene.add(sun);const world=new THREE.Group();scene.add(world);const terrain=new THREE.Mesh(new THREE.PlaneGeometry(32,24),new THREE.MeshStandardMaterial({color:0x294838,roughness:1}));terrain.rotation.x=-Math.PI/2;world.add(terrain);
+  // Quiet landscape texture; no giant procedural routes, rings, tubes or city-wide road grids.
+  const rng=seeded(hashCity(`${state.nation.name}:national-land`));for(let i=0;i<22;i++){const patch=new THREE.Mesh(new THREE.CircleGeometry(.5,10),new THREE.MeshStandardMaterial({color:[0x355942,0x3e6249,0x536243][i%3],roughness:1}));patch.scale.set(1.3+rng()*2.4,.7+rng()*1.5,1);patch.rotation.x=-Math.PI/2;patch.position.set((rng()-.5)*27,.018,(rng()-.5)*19);world.add(patch);}
+  const cities=state.nation.cities||[],positions=[];const center=[-2,0],angles=[0,.95,2.0,3.0,4.1,5.1];cities.forEach((c,i)=>{let x,z;if(i===0){[x,z]=center;}else{const a=angles[(i-1)%angles.length],r=4.2+Math.floor((i-1)/6)*4.1;x=Math.cos(a)*r;z=Math.sin(a)*r*.72;}x=THREE.MathUtils.clamp(x,-10,10);z=THREE.MathUtils.clamp(z,-7,7);positions.push([x,z]);const g=new THREE.Group();g.position.set(x,.06,z);const lvl=Math.max(1,Math.min(10,c.level||1));addKenneyCityAssets(g,c.citySeed||citySeed(c),lvl,{national:true});g.scale.setScalar(.95+Math.min(4,lvl-1)*.08);world.add(g);const base=new THREE.Mesh(new THREE.CylinderGeometry(.95,.95,.035,32),new THREE.MeshStandardMaterial({color:i===0?0x8b7040:0x315e65,roughness:1}));base.position.set(x,.035,z);world.add(base);});
+  // Major national links connect city centres only. They are flat, short and deliberately sparse.
+  const linkMat=new THREE.MeshStandardMaterial({color:0x35464a,roughness:.95});function link(a,b){const dx=b[0]-a[0],dz=b[1]-a[1],len=Math.hypot(dx,dz),m=new THREE.Mesh(new THREE.BoxGeometry(len,.035,.12),linkMat);m.position.set((a[0]+b[0])/2,.045,(a[1]+b[1])/2);m.rotation.y=-Math.atan2(dz,dx);world.add(m);}for(let i=1;i<positions.length;i++)link(positions[0],positions[i]);
+  // Purchased national structures are placed only in explicit empty pads away from city centres.
+  const pads=[[-11,-6],[10,-5],[-10,6],[9,6],[0,9],[0,-9]];const defs=[['factory',LOCAL_ASSETS.industrial],['airport',LOCAL_ASSETS.commercial],['stadium',LOCAL_ASSETS.commercial],['hospital',LOCAL_ASSETS.commercial],['university',LOCAL_ASSETS.commercial],['railway',LOCAL_ASSETS.industrial]];const loads=[...new Set(defs.flatMap(x=>x[1]))];loadAssetSet(loads).then(loaded=>{const map=new Map(loads.map((u,i)=>[u,loaded[i]]));let pi=0;for(const [id,urls] of defs){const amount=Number(state.nation.assets?.[id]||0);for(let k=0;k<amount;k++){const pos=pads[pi++%pads.length];const src=map.get(urls[k%urls.length]);if(!src)continue;const g=cloneKenney(src);g.scale.setScalar(id==='stadium'?.38:.34);g.position.set(pos[0]+(k%2)*.65,.045,pos[1]+Math.floor(k/2)*.65);world.add(g);}}}).catch(()=>{});
+  let dragging=false,lastX=0,lastY=0;renderer.domElement.style.touchAction='none';renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;renderer.domElement.setPointerCapture?.(e.pointerId)});renderer.domElement.addEventListener('pointerup',()=>dragging=false);renderer.domElement.addEventListener('pointercancel',()=>dragging=false);renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;world.rotation.y+=(e.clientX-lastX)*.003;world.rotation.x=THREE.MathUtils.clamp(world.rotation.x+(e.clientY-lastY)*.001,-.08,.08);lastX=e.clientX;lastY=e.clientY});const rec={renderer,scene,camera,group:world,host};citySceneRecords.push(rec);return rec;
 }
-function initCityScenes(){disposeCityScenes();if(!state.nation)return;const hosts=$$('[data-city-scene]');const primary=hosts.slice(0,2);primary.forEach(host=>{const name=host.dataset.cityScene;const c=state.nation.cities.find(x=>x.name===name);if(c)buildCityScene(host,c)});const nationHost=$('#nation-city-scene');if(nationHost){buildNationalScene(nationHost);}const animate=()=>{if(!citySceneRecords.length)return;citySceneRecords.forEach(r=>{if(r.group&&r.host.offsetWidth>0&&r.host.offsetHeight>0){r.group.rotation.y+=.0007;r.group.traverse(o=>{if(o.name==='Citizens'){o.children.forEach(p=>{
-        if(p.userData.walkTX===undefined)return;
-        const dt=Math.min(32,performance.now()-(p.userData.lastWalkTime||performance.now()));
-        p.userData.lastWalkTime=performance.now();
-        let dx=p.userData.walkTX-p.position.x,dz=p.userData.walkTZ-p.position.z;
-        const dist=Math.hypot(dx,dz);
-        if(dist<.08){
-          const path=p.userData.walkPath;
-          p.userData.walkTX=path[0] + (path[2]-path[0])*(Math.random()>.5?0:1);
-          p.userData.walkTZ=path[1] + (path[3]-path[1])*(Math.random()>.5?0:1);
-          dx=p.userData.walkTX-p.position.x;dz=p.userData.walkTZ-p.position.z;
-        }
-        const step=p.userData.walkSpeed*dt;
-        const len=Math.hypot(dx,dz)||1;
-        p.position.x+=dx/len*step;p.position.z+=dz/len*step;p.position.y=.025;
-        p.rotation.y=Math.atan2(dx,dz);
-      });}});r.renderer.render(r.scene,r.camera)}});window.__cityFrame=requestAnimationFrame(animate)};cancelAnimationFrame(window.__cityFrame);window.__cityFrame=requestAnimationFrame(animate)}
+function initCityScenes(){
+  disposeCityScenes();
+  if(!state.nation)return;
+  const hosts=$$('[data-city-scene]');
+  hosts.slice(0,2).forEach(host=>{
+    const name=host.dataset.cityScene;
+    const c=state.nation.cities.find(x=>x.name===name);
+    if(c)buildCityScene(host,c);
+  });
+  const nationHost=$('#nation-city-scene');
+  if(nationHost)buildNationalScene(nationHost);
+  const animate=()=>{
+    if(!citySceneRecords.length)return;
+    const now=performance.now();
+    citySceneRecords.forEach(r=>{
+      if(!r.group||!r.host.offsetWidth||!r.host.offsetHeight)return;
+      r.group.traverse(o=>{
+        if(o.name!=='Citizens')return;
+        o.children.forEach(p=>{
+          if(p.userData.walkTX===undefined)return;
+          const dt=Math.min(50,now-(p.userData.lastWalkTime||now));
+          p.userData.lastWalkTime=now;
+          let dx=p.userData.walkTX-p.position.x;
+          let dz=p.userData.walkTZ-p.position.z;
+          let dist=Math.hypot(dx,dz);
+          if(dist<.06){
+            const path=p.userData.walkPath;
+            p.userData.walkReverse=!p.userData.walkReverse;
+            const a=p.userData.walkReverse?path.b:path.a;
+            const b=p.userData.walkReverse?path.a:path.b;
+            p.userData.walkTX=b[0];p.userData.walkTZ=b[1];
+            dx=b[0]-p.position.x;dz=b[1]-p.position.z;dist=Math.hypot(dx,dz);
+          }
+          const step=p.userData.walkSpeed*(dt/16.67);
+          if(dist>0){
+            p.position.x+=dx/dist*Math.min(step,dist);
+            p.position.z+=dz/dist*Math.min(step,dist);
+            p.rotation.y=Math.atan2(dx,dz);
+          }
+        });
+      });
+      r.group.rotation.y+=.00012;
+      r.renderer.render(r.scene,r.camera);
+    });
+    window.__cityFrame=requestAnimationFrame(animate);
+  };
+  cancelAnimationFrame(window.__cityFrame);
+  window.__cityFrame=requestAnimationFrame(animate);
+}
+
 function renderGame(){tick();disposeHeroScene();const root=$('#app');let body=home();if(state.screen==='skills')body=fullSkills();else if(state.screen==='development')body=fullDevelopment();else if(state.screen==='buildings')body=fullBuildings();else if(state.screen==='store')body=fullStore();else if(state.screen==='cities')body=fullCities();else if(state.screen==='citybuilder')body=cityBuilder();else if(state.screen==='statistics')body=fullStatistics();else if(state.screen==='progress')body=fullProgress();else if(state.screen==='map')body=fullMap();else if(state.screen==='history')body=fullHistory();else if(state.screen==='settings')body=fullSettings();else if(state.screen==='diplomacy')body=placeholder('Global Standing','Diplomacy and relations.');root.innerHTML=`<div class="game ${state.ui?.sidebarCollapsed?'sidebar-collapsed':''}"><div class="sidebarwrap">${sidebar()}</div><div class="gamearea">${topbar()}${mobileStatus()}${body}</div></div>${state.toast?`<div class="toast">${esc(state.toast)}</div>`:''}`;requestAnimationFrame(()=>{initHeroScene();initCityScenes()});}
 
 let landingRenderer,landingScene,landingCamera,landingGlobe,landingFrame;
