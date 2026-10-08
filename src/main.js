@@ -336,7 +336,7 @@ function upgradeSkill(id){const n=state.nation,c=skillCost(id),d=skillDefs.find(
 function buyAsset(id){const n=state.nation,d=storeDefs.find(x=>x.id===id);if(!d)return;if(level().level<d.req)return toast(`Reach Level ${d.req} to unlock this.`);if(!Number.isFinite(d.cost)||d.cost<0)return toast('This purchase cost could not be calculated.');if(n.money<d.cost)return toast('Not enough national wealth.');n.money=Math.max(0,Math.round(n.money-d.cost));n.assets[id]=(n.assets[id]||0)+1;n.xp+=Math.round(d.cost/20000);if(id==='stadium')n.happiness=Math.min(100,n.happiness+3);if(id==='hospital')n.happiness=Math.min(100,n.happiness+4);if(id==='finance')n.reputation+=4;n.history.unshift(`${d.name} was built in ${n.name}.`);save();toast(`${d.name} built`);renderGame();}
 function upgradeCity(){const n=state.nation,c=selectedCity(),cost=Math.round(1800000*Math.pow(1.48,Math.max(0,(c.level||1)-1)));if(!Number.isFinite(cost)||cost<0)return toast('This city upgrade cost could not be calculated.');if(n.money<cost)return toast('Not enough wealth to upgrade this city.');n.money=Math.max(0,Math.round(n.money-cost));c.level=(c.level||1)+1;c.pop=Math.round(c.pop*1.10);c.income=(c.income||0)+420000;c.happiness=Math.min(100,(c.happiness||65)+1);n.cityLevel=Math.max(n.cityLevel||1,c.level);n.happiness=Math.min(100,n.happiness+1);n.xp+=Math.round(cost/18000);n.history.unshift(`${c.name} reached City Level ${c.level}.`);ensureCityVariants(n);save();toast(`${c.name} grew into a larger city`);renderGame();}
 function buildCost(def,c){return Math.round(def.cost*Math.pow(1.14,(c.buildings||[]).filter(x=>x.id===def.id).length));}
-const LOTS=[[-4.8,-4.1],[-2.4,-4.1],[0,-4.1],[2.4,-4.1],[4.8,-4.1],[-4.8,-1.6],[-2.4,-1.6],[2.4,-1.6],[4.8,-1.6],[-4.8,1.6],[-2.4,1.6],[2.4,1.6],[4.8,1.6],[-4.8,4.1],[-2.4,4.1],[0,4.1],[2.4,4.1],[4.8,4.1]];
+const LOTS=[[-3.1,-3.0],[-1.1,-3.0],[1.1,-3.0],[3.1,-3.0],[-3.1,-1.0],[-1.1,-1.0],[1.1,-1.0],[3.1,-1.0],[-3.1,1.0],[-1.1,1.0],[1.1,1.0],[3.1,1.0],[-3.1,3.0],[-1.1,3.0],[1.1,3.0],[3.1,3.0]];
 function buildInCity(id){const n=state.nation,c=selectedCity(),def=BUILD_DEFS.find(x=>x.id===id);if(!def)return;const cost=buildCost(def,c);if(!Number.isFinite(cost)||cost<0)return toast('This building cost could not be calculated.');if(n.money<cost)return toast(`You need ${money(cost)} for ${def.name}.`);if((c.level||1)<(def.cat==='Civic'&&id==='university'?4:def.cat==='Infrastructure'?2:1))return toast('Grow the city further to unlock this.');const used=new Set((c.buildings||[]).map(x=>x.slot));const slot=LOTS.findIndex((_,i)=>!used.has(i));if(slot<0)return toast('All planned lots are occupied. Upgrade the city to unlock more land.');n.money=Math.max(0,Math.round(n.money-cost));c.buildings=c.buildings||[];c.buildings.push({id,slot,level:1});c.income=(c.income||0)+(def.income||0);c.happiness=clamp((c.happiness||65)+(def.happy||0),0,100);c.pop=Math.round((c.pop||0)+(def.pop||0)*.1);n.xp+=Math.round(cost/18000)+35;if(def.cat==='Nature')c.zones.park++;if(def.cat==='Residential')c.zones.residential++;if(def.cat==='Commercial')c.zones.commercial++;if(def.cat==='Industrial')c.zones.industrial++;n.history.unshift(`${def.name} was built in ${c.name}.`);save();toast(`${def.icon} ${def.name} opened in ${c.name}`);renderGame();}
 function addRoadToCity(){const n=state.nation,c=selectedCity(),cost=Math.round(260000*Math.pow(1.12,Math.max(0,c.roads||2)-2));if(n.money<cost)return toast(`You need ${money(cost)} for a new road.`);if((c.roads||2)>=10+(c.level||1)*2)return toast('The current road network is already extensive.');n.money-=cost;c.roads=(c.roads||2)+1;c.income=(c.income||0)+18000;c.happiness=clamp((c.happiness||65)+.25,0,100);n.xp+=45;n.history.unshift(`A new road opened in ${c.name}.`);save();toast('🛣️ Road extended');renderGame();}
 function zoneCity(id){const c=selectedCity();c.zones=c.zones||{};c.zones[id]=(c.zones[id]||0)+1;c.happiness=clamp((c.happiness||65)+(id==='park'?1:.15),0,100);save();toast(`${ZONE_DEFS.find(z=>z.id===id)?.icon||'◈'} ${ZONE_DEFS.find(z=>z.id===id)?.name||id} land reserved`);renderGame();}
@@ -646,39 +646,72 @@ function addKenneyCityAssets(group,seed,level,opts={}){
     loadAssetSet(LOCAL_ASSETS.towers),loadAssetSet(LOCAL_ASSETS.roads),loadAssetSet(LOCAL_ASSETS.nature),loadAssetSet(LOCAL_ASSETS.citizens)
   ]).then(([residential,commercial,industrial,towers,roads,nature,citizens])=>{
     const district=new THREE.Group();district.name='Built From Kenney Packs';city.add(district);
-    const worldR=radius, coreR=Math.min(2.8+lvl*.32,5.1);
-    // Real starter-kit road pieces form the street skeleton.
+    const worldR=radius;
+
+    // Three wide streets in each direction create four large city blocks.
+    // Intersections exist only where the streets actually cross.
+    const roadLines=[-4,0,4];
+    const roadMin=-5.5,roadMax=5.5;
     const rg=new THREE.Group();rg.name='Road Network';district.add(rg);
-    const road=roads[0], cross=roads[2]||road;
-    for(let i=-2;i<=2;i++){
-      const a=cloneKenney(road);a.position.set(i*2.65,.02,-worldR*1.02);a.scale.setScalar(.78);rg.add(a);
-      const b=cloneKenney(road);b.position.set(i*2.65,.021,worldR*1.02);b.rotation.y=Math.PI;b.scale.setScalar(.78);rg.add(b);
+    const straight=roads[0],cross=roads[2]||straight;
+    for(const z of roadLines){
+      for(let x=roadMin;x<=roadMax;x+=1){
+        const r=cloneKenney(straight);r.position.set(x,.02,z);rg.add(r);
+      }
     }
-    for(let i=-2;i<=2;i++){
-      const a=cloneKenney(road);a.position.set(-worldR*1.02,i*2.65,.02);a.rotation.y=Math.PI/2;a.scale.setScalar(.78);rg.add(a);
-      const b=cloneKenney(road);b.position.set(worldR*1.02,i*2.65,.021);b.rotation.y=-Math.PI/2;b.scale.setScalar(.78);rg.add(b);
+    for(const x of roadLines){
+      for(let z=roadMin;z<=roadMax;z+=1){
+        const r=cloneKenney(straight);r.position.set(x,.021,z);r.rotation.y=Math.PI/2;rg.add(r);
+      }
     }
-    const junction=cloneKenney(cross);junction.position.set(0,.025,0);junction.scale.setScalar(.82);rg.add(junction);
+    for(const x of roadLines)for(const z of roadLines){
+      const j=cloneKenney(cross);j.position.set(x,.025,z);rg.add(j);
+    }
 
-    // Residential growth uses actual Starter Kit buildings, not primitive boxes.
-    const homes=new THREE.Group();homes.name='Residential';district.add(homes);
-    placeSpacedKenney(homes,residential,rng,Math.min(28,8+lvl*2),{x0:-worldR*.9,x1:worldR*.9,z0:-worldR*.9,z1:worldR*.9},{min:.72,max:.98},.95,.04);
+    // The spaces between roads are the actual city blocks. Every decorative or
+    // architectural asset is constrained to one of these blocks, with clearance
+    // from the road edges so nothing sits on a street.
+    const blocks=[
+      {x0:-3.45,x1:-.55,z0:-3.45,z1:-.55,name:'NW'},
+      {x0:.55,x1:3.45,z0:-3.45,z1:-.55,name:'NE'},
+      {x0:-3.45,x1:-.55,z0:.55,z1:3.45,name:'SW'},
+      {x0:.55,x1:3.45,z0:.55,z1:3.45,name:'SE'}
+    ];
+    const shuffled=blocks.slice().sort(()=>rng()-.5);
+    const placeInBlock=(group,models,count,block,scaleRange,minGap)=>placeSpacedKenney(
+      group,models,rng,count,block,scaleRange,minGap,.045
+    );
 
-    // Commercial core grows vertically as the city levels up.
-    if(lvl>=2){const shops=new THREE.Group();shops.name='Commercial';district.add(shops);placeSpacedKenney(shops,commercial,rng,Math.min(12,2+lvl),{x0:-coreR,x1:coreR,z0:-coreR,z1:coreR},{min:.62,max:.86},1.15,.045);}
-    if(lvl>=5&&towers.length){const skyline=new THREE.Group();skyline.name='Downtown Skyline';district.add(skyline);placeSpacedKenney(skyline,towers,rng,Math.min(4,1+Math.floor(lvl/2)),{x0:-coreR*.8,x1:coreR*.8,z0:-coreR*.8,z1:coreR*.8},{min:.55,max:.72},1.4,.045);}
+    const homes=new THREE.Group();homes.name='Residential Blocks';district.add(homes);
+    const shops=new THREE.Group();shops.name='Commercial Blocks';district.add(shops);
+    const factories=new THREE.Group();factories.name='Industrial Block';district.add(factories);
+    const skyline=new THREE.Group();skyline.name='Downtown Skyline';district.add(skyline);
+    const green=new THREE.Group();green.name='Green Spaces';district.add(green);
 
-    // Industrial district stays physically separated from the residential core.
-    if(lvl>=3){const factories=new THREE.Group();factories.name='Industrial';district.add(factories);placeSpacedKenney(factories,industrial,rng,Math.min(10,2+lvl),{x0:-worldR*.92,x1:-worldR*.45,z0:-worldR*.72,z1:worldR*.72},{min:.58,max:.82},1.25,.045);}
+    // One block is industrial, one is commercial, and the remaining blocks are
+    // residential/green. This keeps the zoning readable at a glance.
+    const industrialBlock=shuffled[0],commercialBlock=shuffled[1];
+    const residentialBlocks=shuffled.slice(2);
+    if(lvl>=3)placeInBlock(factories,industrial,Math.min(5,2+Math.floor(lvl/2)),industrialBlock,{min:.56,max:.78},.75);
+    if(lvl>=2)placeInBlock(shops,commercial,Math.min(5,2+Math.floor(lvl/2)),commercialBlock,{min:.58,max:.82},.85);
+    residentialBlocks.forEach((block,i)=>{
+      placeInBlock(homes,residential,Math.min(5,2+Math.floor(lvl/2)),block,{min:.62,max:.9},.7);
+      if(i===0){
+        const treeCount=4+Math.min(5,lvl);
+        for(let t=0;t<treeCount;t++){
+          const model=nature[Math.floor(rng()*nature.length)],tree=cloneKenney(model);
+          tree.scale.setScalar(.38+rng()*.24);
+          tree.position.set(block.x0+rng()*(block.x1-block.x0),.035,block.z0+rng()*(block.z1-block.z0));
+          tree.rotation.y=rng()*Math.PI*2;green.add(tree);
+        }
+      }
+    });
+    if(lvl>=5&&towers.length)placeInBlock(skyline,towers,Math.min(2,1+Math.floor(lvl/5)),commercialBlock,{min:.5,max:.66},1.05);
 
-    // Real Kenney starter-kit green pieces fill open space.
-    const green=new THREE.Group();green.name='Green Space';district.add(green);
-    const parks=Math.min(4,1+Math.floor(lvl/2));
-    for(let p=0;p<parks;p++){const cx=(p%2?1:-1)*worldR*.47,cz=(p<2?-1:1)*worldR*.45;for(let i=0;i<4+lvl;i++){const t=cloneKenney(nature[Math.floor(rng()*nature.length)]);t.scale.setScalar(.48+rng()*.32);t.position.set(cx+(rng()-.5)*2.5,.035,cz+(rng()-.5)*1.9);t.rotation.y=rng()*Math.PI*2;green.add(t);}}
-
-    // Mini Characters are the citizens. Population changes affect their density.
+    // Mini Characters remain untouched in this step; their existing city behavior
+    // is preserved while the road/block geometry is corrected around them.
     const people=new THREE.Group();people.name='Citizens';district.add(people);
-    const count=Math.min(24,4+Math.floor(Math.sqrt(Math.max(1,c.pop||0)/50000))+lvl*2);
+    const count=Math.min(24,4+Math.floor(Math.sqrt(Math.max(1,opts.population||0)/50000))+lvl*2);
     for(let i=0;i<count;i++){
       const p=cloneKenney(citizens[Math.floor(rng()*citizens.length)]);p.scale.setScalar(.22+rng()*.055);
       const angle=rng()*Math.PI*2,rad=1.1+rng()*5.1;p.position.set(Math.cos(angle)*rad,.03,Math.sin(angle)*rad);p.rotation.y=rng()*Math.PI*2;
@@ -686,7 +719,6 @@ function addKenneyCityAssets(group,seed,level,opts={}){
     }
   }).catch(err=>console.warn('Local Kenney assets failed to load',err));
 }
-
 function addCozyProjectVisuals(group,c){
   // Retired: the old procedural boxes conflicted with the Kenney visual language.
   // Existing projects remain represented by the real Kenney city districts below.
