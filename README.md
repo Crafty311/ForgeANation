@@ -1,11 +1,5 @@
-# Forge a Nation — V2.15.0.4
+# Forge a Nation — V2.15.1
 
-Foundation and simulation pass.
+Patch: Continue Playing no longer claims to collect or grant money. It simply returns to the Home dashboard and shows a neutral welcome-back message.
 
-- Five seasons, five days each, 25 days per game year.
-- One real-world day away advances one game day on login/return and credits that day's simulated national income automatically.
-- Versioned localStorage saves with a primary save and backup slot; legacy saves are migrated without using `window.name`.
-- Nation Level is derived from the highest City Level.
-- Daily economy, population, city output, progression, city lots and national infrastructure are calculated from live state.
-- The old AP/cozy activity system has been removed; Opportunities + mini-games are the active daily loop.
-- Mobile uses a minimal sound + wordmark header and a functional bottom navigation bar.
+Existing seasons/day system, mobile status treatment, top bar, audio, gameplay, saves, and other functionality are preserved.
