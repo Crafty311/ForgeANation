@@ -2,14 +2,15 @@ import './style.css';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-const KEY='forgeNationV80';
-const SAVE_KEYS=['forgeNationV80','forgeNationV81','forgeNationSave'];
-const OLD_KEYS=['forgeNationV80','forgeNationV74','forgeNationV73','forgeNationV72','forgeNationV71','forgeNationV70'];
+const KEY='forgeNationV82';
+const SAVE_KEYS=['forgeNationV82','forgeNationV81','forgeNationV80','forgeNationSave'];
+const OLD_KEYS=['forgeNationV81','forgeNationV80','forgeNationV74','forgeNationV73','forgeNationV72','forgeNationV71','forgeNationV70'];
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const fmt=n=>new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format(n);
 const money=n=>n>=1e12?'$'+(n/1e12).toFixed(1)+'T':n>=1e9?'$'+(n/1e9).toFixed(1)+'B':n>=1e6?'$'+(n/1e6).toFixed(1)+'M':'$'+Math.round(n/1e3)+'K';
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+const REAL_DAY_MS=86400000;
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
 const focusDefs={
@@ -116,20 +117,6 @@ const OPPORTUNITIES=[
 ];
 
 const defaultState={screen:'landing',nation:null,lastSeen:Date.now(),toast:'',awayEarned:0,ui:{sidebarCollapsed:false,mobileNav:false}};
-const cozyMoments=[
- {id:'market',title:'Sunday Market',desc:'Set up a little market square. Citizens browse, chat and spend.',cost:180000,reward:260000,happy:3,xp:90,icon:'🧺',costAP:1,cat:'Economy'},
- {id:'park',title:'Plant a Pocket Park',desc:'Give a neighborhood somewhere quiet to sit under the trees.',cost:120000,reward:0,happy:4,xp:80,icon:'🌳',costAP:1,cat:'Improve'},
- {id:'cafe',title:'Open a Corner Café',desc:'A tiny café becomes a favorite meeting place.',cost:150000,reward:210000,happy:2,xp:75,icon:'☕',costAP:1,cat:'Business'},
- {id:'playground',title:'Build a Playground',desc:'Add swings and a little play space for local families.',cost:90000,reward:0,happy:3,xp:65,icon:'🛝',costAP:1,cat:'Improve'},
- {id:'library',title:'Open a Neighborhood Library',desc:'Books, study tables and a warm place to spend an afternoon.',cost:220000,reward:0,happy:4,xp:110,icon:'📚',costAP:1,cat:'People'},
- {id:'festival',title:'Lantern Evening',desc:'A small evening festival fills the streets with music and lights.',cost:250000,reward:330000,happy:6,xp:130,icon:'🏮',costAP:2,cat:'Fun'},
- {id:'clean',title:'Clean-Up Day',desc:'Citizens volunteer to tidy streets and public spaces.',cost:45000,reward:0,happy:2,xp:55,icon:'🧹',costAP:1,cat:'Improve'},
- {id:'street',title:'Pretty Up a Street',desc:'Fresh paving, planters and lights turn an ordinary street into a favorite walk.',cost:140000,reward:0,happy:3,xp:70,icon:'🌷',costAP:1,cat:'Improve'},
- {id:'museum',title:'Open a Tiny Exhibit',desc:'Display a local treasure and attract curious visitors.',cost:175000,reward:120000,happy:3,xp:95,icon:'🖼️',costAP:1,cat:'Culture'},
- {id:'neighbors',title:'Neighborhood Gathering',desc:'Listen to residents and help them solve a small local problem.',cost:60000,reward:0,happy:5,xp:85,icon:'👥',costAP:1,cat:'People'},
- {id:'garden',title:'Community Garden',desc:'Turn an empty corner into a shared garden.',cost:80000,reward:40000,happy:4,xp:70,icon:'🌱',costAP:1,cat:'Improve'},
- {id:'concert',title:'Small Street Concert',desc:'Local musicians bring the square to life.',cost:190000,reward:150000,happy:5,xp:105,icon:'🎵',costAP:2,cat:'Fun'}
-];
 const dailyEvents=[
  {id:'sunny',icon:'☀️',title:'A Bright Day',desc:'People are out and about. Parks and cafés feel especially lively.',bonus:{happy:1}},
  {id:'rain',icon:'🌧️',title:'A Rainy Day',desc:'The streets are wet, but cafés and libraries are unusually busy.',bonus:{income:0.08}},
@@ -242,7 +229,7 @@ function miniGameAction(action,value){
   const player=Math.max(0,Math.min(5,Number(value)||0)),ai=Math.floor(Math.random()*6);g.fingers={player,ai,revealing:true};result=player===ai?'draw':player>ai?'win':'loss';
  }else if(g.type==='ttt'){
   const i=Number(value);if(!Number.isInteger(i)||i<0||i>8||g.ttt.board[i]){g.revealing=false;return;}
-  g.ttt.board[i]='X';let w=tttWinner(g.ttt.board);if(!w){const ai=tttAi(g.ttt.board);if(ai!==undefined)g.ttt.board[ai]='O';w=tttWinner(g.ttt.board)||null;}if(w){result=w==='X'?'win':w==='O'?'loss':'draw';g.ttt=freshTtt();}
+  g.ttt.board[i]='X';let w=tttWinner(g.ttt.board);if(!w){const ai=tttAi(g.ttt.board);if(ai!==undefined)g.ttt.board[ai]='O';w=tttWinner(g.ttt.board)||null;}if(w){result=w==='X'?'win':w==='O'?'loss':'draw';g.ttt.winner=w;}
  }
  if(result){save();renderGame();setTimeout(()=>{if(g.type==='coin'&&g.coin)g.coin.flipping=false;if(g.rps)g.rps.revealing=false;if(g.fingers)g.fingers.revealing=false;g.revealing=false;resolveActivityResult(result);},g.type==='coin'?1250:650);}
  else{g.revealing=false;save();renderGame();}
@@ -252,7 +239,7 @@ function endDay(){
  const n=state.nation,z=cozyFor(n);if(z.dayEnded)return toast('Today has already ended.');
  const wins=z.won?.length||0,losses=z.failed?.length||0;if(wins<3&&losses<3)return toast(`Win 3 activities to move on, or lose 3 and pay ${money(1000000)} to move on.`);
  const penalty=losses>=3&&wins<3?1000000:0;if(penalty&&n.money<penalty)return toast(`You need ${money(penalty)} to move to the next day.`);
- const endingDay=z.dayIndex,ev=dailyEvent(n),daily=Math.max(0,Math.round(income()*(1+(ev.bonus?.income||0))));n.money=Math.max(0,Math.round(n.money+daily-penalty));n.awayEarned=(n.awayEarned||0)+daily;n.xp+=80+wins*28;n.population+=Math.max(25,Math.round(n.population*.000012));
+ const endingDay=z.dayIndex,ev=dailyEvent(n),daily=Math.max(0,Math.round(income()*(1+(ev.bonus?.income||0))));n.money=Math.max(0,Math.round(n.money+daily-penalty));n.xp+=80+wins*28;n.population+=Math.max(25,Math.round(n.population*.000012));
  n.cities.forEach(c=>{const b=c.buildings||[];const incomeBoost=b.reduce((a,x)=>a+(BUILD_DEFS.find(d=>d.id===x.id)?.income||0),0);c.income=(c.income||0)+Math.round((c.level||1)*14000)+incomeBoost*.04;if((c.cozy?.mood||0)>0)c.happiness=clamp((c.happiness||65)+.25,0,100);const homes=b.reduce((a,x)=>a+(BUILD_DEFS.find(d=>d.id===x.id)?.pop||0),0);c.pop=Math.round((c.pop||0)+homes*.006)});
  n.happiness=clamp(n.happiness+(wins>=3?1:.25),0,100);z.streak++;z.dayEnded=true;z.lastReport={day:endingDay,earned:daily-penalty,activities:z.done.length,wins,losses,penalty,event:ev.title,season:internalDate(n).season};
  const city=selectedCity(),names=['Mira','Arif','Nadia','Samir','Lina'],who=names[endingDay%names.length];n.cozy.mailbox=[{icon:'💌',title:`${who} noticed your work`,text:`“${city.name} feels a little more alive today.”`,day:endingDay},...(n.cozy.mailbox||[])].slice(0,8);
@@ -265,40 +252,92 @@ let state=load();
 window.addEventListener('pagehide',()=>{try{save()}catch{}});
 window.addEventListener('beforeunload',()=>{try{save()}catch{}});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'){try{save()}catch{}}});
-function load(){
-  try{
-    const keys=[...SAVE_KEYS,...OLD_KEYS].filter((v,i,a)=>a.indexOf(v)===i);
-    for(const k of keys){
-      const raw=localStorage.getItem(k);
-      if(!raw)continue;
-      const x=JSON.parse(raw);
-      if(x?.nation){
-        const restored={...defaultState,...x};
-        restored.screen=['home','skills','store','development','buildings','cities','citybuilder','statistics','progress','map','history','settings','diplomacy'].includes(restored.screen)?restored.screen:'home';
-        return migrate(restored);
-      }
+function stateForAway(s){
+  if(!s?.nation)return s;
+  const previous=Number(s.lastSeen)||Date.now();
+  const elapsed=Math.floor(Math.max(0,Date.now()-previous)/REAL_DAY_MS);
+  if(elapsed>0){
+    const n=s.nation;
+    for(let i=0;i<elapsed;i++){
+      const ev=dailyEvent(n),daily=Math.max(0,Math.round(incomeForNation(n)*(1+(ev.bonus?.income||0))));
+      n.money=Math.max(0,Math.round(n.money+daily));n.awayEarned=(n.awayEarned||0)+daily;n.xp+=80;n.population+=Math.max(25,Math.round(n.population*.000012));
+      n.cities.forEach(c=>{const b=c.buildings||[];const boost=b.reduce((a,x)=>a+(BUILD_DEFS.find(d=>d.id===x.id)?.income||0),0);c.income=(c.income||0)+Math.round((c.level||1)*14000)+boost*.04;const homes=b.reduce((a,x)=>a+(BUILD_DEFS.find(d=>d.id===x.id)?.pop||0),0);c.pop=Math.round((c.pop||0)+Math.max(1,homes*.006));});
+      n.happiness=clamp(n.happiness+.2,0,100);n.cozy.dayIndex=(n.cozy.dayIndex||1)+1;n.cozy.day=dayKey(n);startCozyDay(n);
     }
-  }catch(e){ console.warn('Nation save could not be read',e); }
-  try{const raw=window.name;if(raw){const x=JSON.parse(raw);if(x?.nation)return migrate(x);}}catch(e){console.warn('Fallback nation save could not be read',e)}
+    n.history=n.history||[];n.history.unshift(`${elapsed} day${elapsed===1?'':'s'} passed while you were away.`);
+  }
+  s.lastSeen=Date.now();return s;
+}
+function incomeForNation(n){let total=2430000;for(const d of skillDefs)total*=1+(Math.max(0,n.skills?.[d.id]-1)*d.gain*.18);for(const id in (n.assets||{})){const d=storeDefs.find(x=>x.id===id);if(d)total+=n.assets[id]*d.inc}return total*(focusDefs[n.focus]?.income||1)*(1+(n.cityLevel||1)*.055);}
+function load(){
+  const keys=[...SAVE_KEYS,...OLD_KEYS].filter((v,i,a)=>a.indexOf(v)===i);
+  for(const k of keys){
+    try{
+      const raw=localStorage.getItem(k);if(!raw)continue;
+      const x=JSON.parse(raw);if(!x?.nation)continue;
+      const restored={...defaultState,...x};
+      restored.screen=['home','skills','store','development','buildings','cities','citybuilder','statistics','progress','map','history','settings','diplomacy'].includes(restored.screen)?restored.screen:'home';
+      const migrated=migrate(restored);stateForAway(migrated);return migrated;
+    }catch(e){console.warn(`Nation save ${k} could not be read; trying the next backup.`,e);}
+  }
   return {...defaultState};
 }
 function migrate(s){
   const n=s.nation;if(!n)return s;
   n.skills={industry:1,education:1,infrastructure:1,technology:1,health:1,commerce:1,culture:1,...n.skills};
   n.assets={...n.assets};n.cityLevel=n.cityLevel||3;n.reputation=n.reputation??32;n.happiness=n.happiness??68;n.xp=n.xp??384;n.money=n.money??12400000;n.population=n.population??1200000;n.cities=n.cities?.length?n.cities:[{name:n.name+' City',type:'Capital City',level:n.cityLevel,pop:n.population*.45,income:4800000,happiness:72}];
-  n.history=n.history||[];n.created=n.created||Date.now();n.focus=n.focus||'industrial';s.ui={sidebarCollapsed:false,mobileNav:false,...(s.ui||{})};n.cozy=n.cozy||{};n.cozy.dayIndex=Math.max(1,n.cozy.dayIndex||1);n.cozy.activityUsed=Number(n.cozy.activityUsed)||0;n.cities.forEach(c=>{c.cozy=c.cozy||{projects:[],mood:0,decor:[],requests:[]};c.buildings=Array.isArray(c.buildings)?c.buildings:[];c.roads=Number(c.roads)||2;c.zones=c.zones||{residential:2,commercial:1,industrial:1,park:2};});cozyFor(n);ensureCityVariants(n);
+  n.history=n.history||[];n.created=n.created||Date.now();n.focus=n.focus||'industrial';n.cityLevel=Math.max(1,...n.cities.map(c=>Number(c.level)||1));s.ui={sidebarCollapsed:false,mobileNav:false,...(s.ui||{})};n.cozy=n.cozy||{};n.cozy.dayIndex=Math.max(1,n.cozy.dayIndex||1);n.cities.forEach(c=>{c.cozy=c.cozy||{projects:[],mood:0,decor:[],requests:[]};c.buildings=Array.isArray(c.buildings)?c.buildings:[];c.roads=Number(c.roads)||2;c.zones=c.zones||{residential:2,commercial:1,industrial:1,park:2};});cozyFor(n);ensureCityVariants(n);
   return s;
 }
 function save(){
   state.lastSeen=Date.now();
   const payload=JSON.stringify(state);
-  try{for(const k of SAVE_KEYS)localStorage.setItem(k,payload);window.name=payload;}catch(e){try{window.name=payload}catch{} console.warn('Nation save failed',e);}
+  try{for(const k of SAVE_KEYS)localStorage.setItem(k,payload);}catch(e){console.warn('Nation save failed',e);}
 }
 function skillCost(id){const lv=state.nation.skills[id]||1,d=skillDefs.find(x=>x.id===id);return Math.round(d.base*Math.pow(1.48,lv-1));}
-function level(){let out=levels[0];for(const x of levels)if(state.nation.xp>=x.xp)out=x;return out;}
+function level(){const maxCity=Math.max(1,...(state.nation?.cities||[]).map(c=>Number(c.level)||1));return levels[Math.min(levels.length,maxCity)-1]||levels[0];}
 function nextLevel(){return levels[level().level]||null;}
-function xpPct(){const l=level(),n=nextLevel();return n?clamp((state.nation.xp-l.xp)/(n.xp-l.xp)*100,0,100):100;}
-function income(){const n=state.nation;let total=2430000;for(const d of skillDefs)total*=1+(Math.max(0,n.skills[d.id]-1)*d.gain*.18);for(const id in n.assets){const d=storeDefs.find(x=>x.id===id);if(d)total+=n.assets[id]*d.inc}return total*(focusDefs[n.focus]?.income||1)*(1+n.cityLevel*.055);}
+function xpPct(){const l=level(),n=nextLevel();if(!n)return 100;const maxCity=Math.max(1,...(state.nation?.cities||[]).map(c=>Number(c.level)||1));return clamp((maxCity-l.level)/(n.level-l.level)*100,0,100);}
+function income(){const n=state.nation;let total=1400000;const cityIncome=(n.cities||[]).reduce((a,c)=>a+Math.max(0,Number(c.income)||0),0);total+=Math.round(cityIncome*.18);for(const d of skillDefs)total*=1+(Math.max(0,(n.skills?.[d.id]||1)-1)*d.gain*.18);for(const id in (n.assets||{})){const d=storeDefs.find(x=>x.id===id);if(d)total+=(n.assets[id]||0)*d.inc}return Math.round(total*(focusDefs[n.focus]?.income||1)*(1+(level().level)*.055));}
+function simulateAwayDays(days){
+  const n=state.nation;if(!n||days<=0)return 0;
+  let earned=0;
+  for(let i=0;i<days;i++){
+    const ev=dailyEvent(n);
+    const daily=Math.max(0,Math.round(income()*(1+(ev.bonus?.income||0))));
+    n.money=Math.max(0,Math.round(n.money+daily));
+    earned+=daily;
+    n.awayEarned=(n.awayEarned||0)+daily;
+    n.xp+=80;
+    n.population+=Math.max(25,Math.round(n.population*.000012));
+    n.cities.forEach(c=>{
+      const b=c.buildings||[];
+      const incomeBoost=b.reduce((a,x)=>a+(BUILD_DEFS.find(d=>d.id===x.id)?.income||0),0);
+      c.income=(c.income||0)+Math.round((c.level||1)*14000)+incomeBoost*.04;
+      const homes=b.reduce((a,x)=>a+(BUILD_DEFS.find(d=>d.id===x.id)?.pop||0),0);
+      c.pop=Math.round((c.pop||0)+Math.max(1,homes*.006));
+    });
+    n.happiness=clamp(n.happiness+.2,0,100);
+    n.cozy.dayIndex=(n.cozy.dayIndex||1)+1;
+    n.cozy.day=dayKey(n);
+    startCozyDay(n);
+  }
+  n.history.unshift(`${days} day${days===1?'':'s'} passed while you were away. ${money(earned)} was earned automatically.`);
+  return earned;
+}
+function applyAwaySimulation(){
+  if(!state.nation)return;
+  const previous=Number(state.lastSeen)||Date.now();
+  const elapsed=Math.floor(Math.max(0,Date.now()-previous)/REAL_DAY_MS);
+  if(elapsed>0){
+    simulateAwayDays(elapsed);
+    state.lastSeen=Date.now();
+    save();
+    return elapsed;
+  }
+  state.lastSeen=Date.now();
+  return 0;
+}
 function tick(){if(!state.nation)return;state.lastSeen=Date.now();}
 function createNation(){
  const name=($('#nationName')?.value||'Novara').trim()||'Novara';
@@ -331,12 +370,12 @@ function createNation(){
  state.nation.history.unshift(`Starting package: ${terrain} geography + ${gov} institutions + ${fd.name} focus.`);
  state.screen='home';state.lastSeen=Date.now();save();showGame();sfx('success');toast(`Nation forged. ${terrain} + ${fd.name} starting package applied.`);
 }
-function newNation(){if(confirm('Start a new nation? Your current nation will be replaced.')){try{[...new Set([...SAVE_KEYS,...OLD_KEYS])].forEach(k=>localStorage.removeItem(k));}catch{}try{window.name='';}catch{}state={...defaultState,screen:'landing'};showLanding();}}
+function newNation(){if(confirm('Start a new nation? Your current nation will be replaced.')){try{[...new Set([...SAVE_KEYS,...OLD_KEYS])].forEach(k=>localStorage.removeItem(k));}catch{}state={...defaultState,screen:'landing'};showLanding();}}
 function upgradeSkill(id){const n=state.nation,c=skillCost(id),d=skillDefs.find(x=>x.id===id);if(!Number.isFinite(c)||c<0)return toast('This upgrade cost could not be calculated.');if(n.money<c)return toast('You need more national wealth.');n.money=Math.max(0,Math.round(n.money-c));n.skills[id]++;n.xp+=Math.round(c/28000)+70;n.history.unshift(`${d.name} advanced to Level ${n.skills[id]}.`);save();toast(`${d.name} upgraded`);renderGame();}
 function buyAsset(id){const n=state.nation,d=storeDefs.find(x=>x.id===id);if(!d)return;if(level().level<d.req)return toast(`Reach Level ${d.req} to unlock this.`);if(!Number.isFinite(d.cost)||d.cost<0)return toast('This purchase cost could not be calculated.');if(n.money<d.cost)return toast('Not enough national wealth.');n.money=Math.max(0,Math.round(n.money-d.cost));n.assets[id]=(n.assets[id]||0)+1;n.xp+=Math.round(d.cost/20000);if(id==='stadium')n.happiness=Math.min(100,n.happiness+3);if(id==='hospital')n.happiness=Math.min(100,n.happiness+4);if(id==='finance')n.reputation+=4;n.history.unshift(`${d.name} was built in ${n.name}.`);save();toast(`${d.name} built`);renderGame();}
-function upgradeCity(){const n=state.nation,c=selectedCity(),cost=Math.round(1800000*Math.pow(1.48,Math.max(0,(c.level||1)-1)));if(!Number.isFinite(cost)||cost<0)return toast('This city upgrade cost could not be calculated.');if(n.money<cost)return toast('Not enough wealth to upgrade this city.');n.money=Math.max(0,Math.round(n.money-cost));c.level=(c.level||1)+1;c.pop=Math.round(c.pop*1.10);c.income=(c.income||0)+420000;c.happiness=Math.min(100,(c.happiness||65)+1);n.cityLevel=Math.max(n.cityLevel||1,c.level);n.happiness=Math.min(100,n.happiness+1);n.xp+=Math.round(cost/18000);n.history.unshift(`${c.name} reached City Level ${c.level}.`);ensureCityVariants(n);save();toast(`${c.name} grew into a larger city`);renderGame();}
+function upgradeCity(index=null){const n=state.nation;if(index!==null&&Number.isInteger(Number(index))){n.cozy=n.cozy||{};n.cozy.selectedCity=clamp(Number(index),0,n.cities.length-1);}const c=selectedCity(),cost=Math.round(1800000*Math.pow(1.48,Math.max(0,(c.level||1)-1)));if(!Number.isFinite(cost)||cost<0)return toast('This city upgrade cost could not be calculated.');if(n.money<cost)return toast('Not enough wealth to upgrade this city.');n.money=Math.max(0,Math.round(n.money-cost));c.level=(c.level||1)+1;c.pop=Math.round(c.pop*1.10);c.income=(c.income||0)+420000;c.happiness=Math.min(100,(c.happiness||65)+1);n.cityLevel=Math.max(n.cityLevel||1,c.level);n.happiness=Math.min(100,n.happiness+1);n.xp+=Math.round(cost/18000);n.history.unshift(`${c.name} reached City Level ${c.level}.`);n.progressRewards=n.progressRewards||[];if(!n.progressRewards.includes(c.level)){n.progressRewards.push(c.level);const reward=250000*c.level;n.money+=reward;n.reputation+=1;n.history.unshift(`Nation Level ${c.level} reward: ${money(reward)} and +1 reputation.`);}ensureCityVariants(n);save();toast(`${c.name} grew into a larger city`);renderGame();}
 function buildCost(def,c){return Math.round(def.cost*Math.pow(1.14,(c.buildings||[]).filter(x=>x.id===def.id).length));}
-const LOTS=[[-4.8,-4.1],[-2.4,-4.1],[0,-4.1],[2.4,-4.1],[4.8,-4.1],[-4.8,-1.6],[-2.4,-1.6],[2.4,-1.6],[4.8,-1.6],[-4.8,1.6],[-2.4,1.6],[2.4,1.6],[4.8,1.6],[-4.8,4.1],[-2.4,4.1],[0,4.1],[2.4,4.1],[4.8,4.1]];
+const LOTS=[-3.3,-1.1,1.1,3.3].flatMap(x=>[-3.3,-1.1,1.1,3.3].map(z=>[x,z]));
 function buildInCity(id){const n=state.nation,c=selectedCity(),def=BUILD_DEFS.find(x=>x.id===id);if(!def)return;const cost=buildCost(def,c);if(!Number.isFinite(cost)||cost<0)return toast('This building cost could not be calculated.');if(n.money<cost)return toast(`You need ${money(cost)} for ${def.name}.`);if((c.level||1)<(def.cat==='Civic'&&id==='university'?4:def.cat==='Infrastructure'?2:1))return toast('Grow the city further to unlock this.');const used=new Set((c.buildings||[]).map(x=>x.slot));const slot=LOTS.findIndex((_,i)=>!used.has(i));if(slot<0)return toast('All planned lots are occupied. Upgrade the city to unlock more land.');n.money=Math.max(0,Math.round(n.money-cost));c.buildings=c.buildings||[];c.buildings.push({id,slot,level:1});c.income=(c.income||0)+(def.income||0);c.happiness=clamp((c.happiness||65)+(def.happy||0),0,100);c.pop=Math.round((c.pop||0)+(def.pop||0)*.1);n.xp+=Math.round(cost/18000)+35;if(def.cat==='Nature')c.zones.park++;if(def.cat==='Residential')c.zones.residential++;if(def.cat==='Commercial')c.zones.commercial++;if(def.cat==='Industrial')c.zones.industrial++;n.history.unshift(`${def.name} was built in ${c.name}.`);save();toast(`${def.icon} ${def.name} opened in ${c.name}`);renderGame();}
 function addRoadToCity(){const n=state.nation,c=selectedCity(),cost=Math.round(260000*Math.pow(1.12,Math.max(0,c.roads||2)-2));if(n.money<cost)return toast(`You need ${money(cost)} for a new road.`);if((c.roads||2)>=10+(c.level||1)*2)return toast('The current road network is already extensive.');n.money-=cost;c.roads=(c.roads||2)+1;c.income=(c.income||0)+18000;c.happiness=clamp((c.happiness||65)+.25,0,100);n.xp+=45;n.history.unshift(`A new road opened in ${c.name}.`);save();toast('🛣️ Road extended');renderGame();}
 function zoneCity(id){const c=selectedCity();c.zones=c.zones||{};c.zones[id]=(c.zones[id]||0)+1;c.happiness=clamp((c.happiness||65)+(id==='park'?1:.15),0,100);save();toast(`${ZONE_DEFS.find(z=>z.id===id)?.icon||'◈'} ${ZONE_DEFS.find(z=>z.id===id)?.name||id} land reserved`);renderGame();}
@@ -392,27 +431,27 @@ function stopMusic(){if(AUDIO.loopTimer){clearTimeout(AUDIO.loopTimer);AUDIO.loo
 function tone(freq,dur,type='sine',gain=.025,delay=0){if(!soundEnabled()||!AUDIO.ctx)return;const c=AUDIO.ctx,o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.setValueAtTime(freq,c.currentTime+delay);g.gain.setValueAtTime(.0001,c.currentTime+delay);g.gain.exponentialRampToValueAtTime(gain,c.currentTime+delay+.008);g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+delay+dur);o.connect(g).connect(c.destination);o.start(c.currentTime+delay);o.stop(c.currentTime+delay+dur+.02);}
 function sfx(kind='click'){ensureAudio();if(!soundEnabled())return;if(AUDIO.ctx?.state==='suspended')AUDIO.ctx.resume();if(kind==='click'){tone(520,.045,'sine',.018);tone(760,.025,'sine',.008,.018)}else if(kind==='open'){tone(360,.06,'sine',.018);tone(620,.09,'sine',.012,.035)}else if(kind==='success'){tone(520,.07,'sine',.025);tone(660,.08,'sine',.022,.06);tone(820,.13,'sine',.018,.13)}else if(kind==='fail'){tone(190,.11,'triangle',.025);tone(140,.16,'triangle',.018,.08)}else if(kind==='draw'){tone(430,.08,'sine',.018);tone(430,.08,'sine',.012,.11)}else if(kind==='coin'){tone(720,.035,'triangle',.012);tone(920,.035,'triangle',.012,.04);tone(1120,.06,'triangle',.01,.08)}}
 function toggleSound(){state.ui=state.ui||{};state.ui.soundMuted=!state.ui.soundMuted;save();ensureAudio();if(state.ui.soundMuted)stopMusic();else{startMusic();sfx('success')}renderGame();}
-function topbar(){const n=state.nation;return `<header class="topbar"><div class="topleft"><button class="menubtn" data-action="toggle-sidebar" aria-label="Toggle navigation">☰</button><button class="soundbtn" data-action="toggle-sound" aria-label="Toggle sound">${state.ui?.soundMuted?'🔇':'🔊'}</button><div class="topactions"><button class="topaction primary" data-action="continue">▶ <span>Continue Nation</span></button><button class="topaction secondary" data-action="new">＋ <span>New Nation</span></button></div><div class="daystatus"><span>Year ${internalDate(n).year}</span><b>${internalDate(n).season} · Day ${internalDate(n).dayOfYear}</b></div></div><div class="topbrand">FORGE A NATION</div><div class="topstats"><div class="topstat">${icon('◉','goldic')}<span><b>${money(n.money)}</b><small>Money</small></span></div><div class="topstat">${icon('♟','blueic')}<span><b>${fmt(n.population/1e6)}M</b><small>Population</small></span></div><div class="topstat">${icon('★','goldic')}<span><b>${Math.round(n.reputation)}</b><small>Reputation</small></span></div><div class="topcredit">Made by <b>Sajid</b><span class="topcredit-links"><a href="https://www.instagram.com/sajidaddin" target="_blank" rel="noopener noreferrer">@sajidaddin</a><a href="https://www.instagram.com/sajidphobic" target="_blank" rel="noopener noreferrer">@sajidphobic</a></span></div></div></header>`;}
+function topbar(){const n=state.nation;return `<header class="topbar"><div class="topleft"><button class="menubtn" data-action="toggle-sidebar" aria-label="Toggle navigation">☰</button><button class="soundbtn" data-action="toggle-sound" aria-label="Toggle sound">${state.ui?.soundMuted?'🔇':'🔊'}</button><div class="daystatus"><span>Year ${internalDate(n).year}</span><b>${internalDate(n).season} · Day ${internalDate(n).dayOfYear}</b></div></div><div class="topbrand">FORGE A NATION</div><div class="topstats"><div class="topstat">${icon('◉','goldic')}<span><b>${money(n.money)}</b><small>Money</small></span></div><div class="topstat">${icon('♟','blueic')}<span><b>${fmt(n.population/1e6)}M</b><small>Population</small></span></div><div class="topstat">${icon('★','goldic')}<span><b>${Math.round(n.reputation)}</b><small>Reputation</small></span></div><div class="topcredit">Made by <b>Sajid</b><span class="topcredit-links"><a href="https://www.instagram.com/sajidaddin" target="_blank" rel="noopener noreferrer">@sajidaddin</a><a href="https://www.instagram.com/sajidphobic" target="_blank" rel="noopener noreferrer">@sajidphobic</a></span></div></div></header>`;}
 function mobileStatus(){const n=state.nation,d=internalDate(n);return `<div class="mobile-status"><div class="mobile-date"><b>Year ${d.year}</b><span>${d.season} · Day ${d.dayOfYear}</span></div><div class="mobile-stat"><small>Money</small><b>${money(n.money)}</b></div><div class="mobile-stat"><small>Population</small><b>${fmt(n.population/1e6)}M</b></div><div class="mobile-stat"><small>Reputation</small><b>${Math.round(n.reputation)}</b></div></div>`;}
 function sidebar(){const items=[['home','⌂','Home'],['map','●','Map'],['cities','▥','Cities'],['citybuilder','🏗','Build City'],['buildings','▣','Buildings'],['skills','◈','Skills'],['development','◆','Development'],['store','▤','Store'],['statistics','▥','Statistics'],['history','▤','History'],['settings','⚙','Settings']];const collapsed=!!state.ui?.sidebarCollapsed;return `<aside class="sidebar ${collapsed?'collapsed':''} ${state.ui?.mobileNav?'mobile-open':''}" aria-label="Nation navigation"><div class="brand"><h1>FN</h1></div><div class="sidehint">${collapsed?'':'YOUR NATION'}</div><nav aria-label="Game sections">${items.map(([id,ic,label])=>`<button class="navitem ${state.screen===id?'active':''}" data-screen="${id}" title="${label}" aria-label="${label}">${icon(ic)}<span>${label}</span></button>`).join('')}</nav>${credits()}</aside><div class="navscrim ${state.ui?.mobileNav?'show':''}" data-action="close-mobile-nav"></div>`;}
 function hero(){
  const n=state.nation,l=level(),z=cozyFor(n),ev=dailyEvent(n),daily=Math.round(income()),next=nextLevel();
  const wins=z.won?.length||0,losses=z.failed?.length||0,city=selectedCity();
- return `<section class="hero"><div class="hero-scene" id="hero-scene" aria-label="Artistic 3D national panorama"></div><div class="heroShade"></div><div class="heroContent"><div class="welcome"><small>Welcome Back,</small><h1>${esc(n.name)}</h1><p>A small nation with big dreams.</p></div><div class="nationcard"><div class="emblem">✦</div><div class="nationcardbody"><b>${esc(n.name)}</b><span>${l.name}</span><small>Lv. ${l.level}</small><div class="bar"><i style="width:${xpPct()}%"></i></div><em>${Math.floor(n.xp).toLocaleString()} / ${(next?.xp||n.xp).toLocaleString()}</em></div></div><button class="gold continue" data-action="continue">▶ &nbsp; Continue Playing</button></div><div class="metrics">${metric('◉','National Wealth',money(n.money),'+'+money(daily)+'/day')} ${metric('♟','Population',fmt(n.population/1e6)+'M','+8.6K/day')} ${metric('☺','Happiness',Math.round(n.happiness)+'%','+1.3%')} ${metric('★','Reputation',Math.round(n.reputation),'+2.4%')}</div><aside class="away pulse"><div class="pulsehead"><h3>National Pulse</h3><span>Day ${internalDate(n).dayOfYear}</span></div><div class="pulseevent">${ev.icon} <section><b>${esc(ev.title)}</b><small>${esc(ev.desc)}</small></section></div><div class="pulsegrid"><div><b>${money(daily)}</b><span>Projected daily income</span></div><div><b>${wins}/3</b><span>Activity wins</span></div><div><b>Lv. ${l.level}</b><span>National stage</span></div><div><b>${city.level}</b><span>${esc(city.name)} level</span></div></div><div class="pulsefooter"><span>${losses} failed activities</span><span>${next?Math.max(0,next.xp-n.xp).toLocaleString()+' XP to next stage':'Top stage reached'}</span></div></aside></section>`;
+ return `<section class="hero"><div class="hero-scene" id="hero-scene" aria-label="Artistic 3D national panorama"></div><div class="heroShade"></div><div class="heroContent"><div class="welcome"><small>Welcome Back,</small><h1>${esc(n.name)}</h1><p>A small nation with big dreams.</p></div><div class="nationcard"><div class="emblem">✦</div><div class="nationcardbody"><b>${esc(n.name)}</b><span>${l.name}</span><small>Lv. ${l.level}</small><div class="bar"><i style="width:${xpPct()}%"></i></div><em>${Math.floor(n.xp).toLocaleString()} / ${(next?.xp||n.xp).toLocaleString()}</em></div></div></div><div class="metrics">${metric('◉','National Wealth',money(n.money),'+'+money(daily)+'/day')} ${metric('♟','Population',fmt(n.population/1e6)+'M','+'+fmt(Math.max(25,Math.round(n.population*.000012)))+'/day')} ${metric('☺','Happiness',Math.round(n.happiness)+'%',(n.happiness>=70?'+':'')+Math.round((n.happiness-65)*10)/10+'%')} ${metric('★','Reputation',Math.round(n.reputation),'National standing')}</div><aside class="away pulse"><div class="pulsehead"><h3>National Pulse</h3><span>Day ${internalDate(n).dayOfYear}</span></div><div class="pulseevent">${ev.icon} <section><b>${esc(ev.title)}</b><small>${esc(ev.desc)}</small></section></div><div class="pulsegrid"><div><b>${money(daily)}</b><span>Projected daily income</span></div><div><b>${wins}/3</b><span>Activity wins</span></div><div><b>Lv. ${l.level}</b><span>National stage</span></div><div><b>${city.level}</b><span>${esc(city.name)} level</span></div></div><div class="pulsefooter"><span>${losses} failed activities</span><span>${next?Math.max(0,next.xp-n.xp).toLocaleString()+' XP to next stage':'Top stage reached'}</span></div></aside></section>`;
 }
 function metric(ic,title,value,delta){return `<div class="metric">${icon(ic)}<div><small>${title}</small><strong>${value}</strong><em>${delta}</em></div></div>`;}
 function skillsCard(){const n=state.nation;return `<section class="panel skills-panel"><div class="paneltitle"><h2>National Skills</h2><button class="textbtn" data-screen="skills">View All</button></div>${skillDefs.map(d=>`<div class="skillrow"><div class="skillicon ${d.cls}">${d.icon}</div><div><b>${d.name}</b><small>Lv. ${n.skills[d.id]} · ${d.effect}</small></div><button class="mini greenbtn" data-skill="${d.id}">Upgrade<span>${money(skillCost(d.id))}</span></button></div>`).join('')}</section>`;}
-function storeCard(){const n=state.nation;return `<section class="panel store-panel"><div class="paneltitle"><h2>Development Store</h2><button class="textbtn" data-screen="store">View All</button></div><div class="tabs"><button class="active">All</button><button>Economic</button><button>Civic</button><button>Culture</button><button>Luxury</button></div><div class="storelist">${storeDefs.slice(0,6).map(d=>{const ok=level().level>=d.req,can=n.money>=d.cost;return `<div class="storeitem"><img src="/${d.img}" alt=""><div><b>${d.name}</b><small>${d.desc}</small></div><strong>${money(d.cost)}</strong><button class="mini ${ok&&can?'greenbtn':'lockbtn'}" data-buy="${d.id}" ${ok&&can?'':'disabled'}>${ok?'Buy':'🔒'}</button></div>`}).join('')}</div></section>`;}
-function cityCard(){const n=state.nation,c=n.cities[0],cityCost=Math.round(1800000*Math.pow(1.55,n.cityLevel-1));return `<section class="panel city-panel"><div class="paneltitle"><h2>City Overview</h2><button class="textbtn" data-screen="cities">View All</button></div><div class="cityimage city3d" data-city-scene="${esc(c.name)}"><span>Lv. ${c.level}</span></div><div class="cityhead"><div><b>${esc(c.name)}</b><small>◉ Capital City</small></div></div><div class="citystats"><div>${icon('♟')}<small>Population</small><b>${fmt(c.pop/1e6)}M</b><em>+3.2K/day</em></div><div>${icon('◉')}<small>Income</small><b>${money(c.income)}</b><em>+12%</em></div><div>${icon('♥')}<small>Happiness</small><b>${Math.round(c.happiness)}%</b><em>+4%</em></div></div><h3>City Buildings</h3>${['Residential Zone','Industrial Zone','Commercial Zone','Infrastructure'].map((x,i)=>`<div class="buildingrow"><div class="buildingbadge">${['⌂','▥','▣','◆'][i]}</div><div><b>${x}</b><small>Lv. ${Math.min(3,c.level)} · +${(i+1)*2}%</small></div><button class="mini greenbtn" data-action="cityup">Upgrade<span>${money(1600000+i*400000)}</span></button></div>`).join('')}<button class="cityupgrade gold" data-action="open-city-builder" data-city-index="0">Open City Builder</button><button class="cityupgrade outline" data-action="cityup">Upgrade City · ${money(cityCost)}</button></section>`;}
-function progressCard(){const n=state.nation,l=level(),next=nextLevel();return `<section class="panel progress-panel"><div class="paneltitle"><h2>Development Progress</h2></div><div class="stage"><small>Current Stage</small><b>${l.name}</b><span>Lv. ${l.level}</span><div class="bar"><i style="width:${xpPct()}%"></i></div><em>${Math.floor(n.xp).toLocaleString()} / ${(next?.xp||n.xp).toLocaleString()}</em></div><div class="next"><small>Next Promotion</small><h3>${next?next.name:'World-Class Nation'}</h3>${next?`<p>Requirements:</p><div>✓ Reach ${next.xp.toLocaleString()} development XP</div><div>✓ Grow your national wealth</div><div>✓ Upgrade key capabilities</div><hr><p>Rewards:</p><div>+18% National Income</div><div>New buildings unlocked</div><button class="gold" data-screen="statistics">View Progression</button>`:`<p>Your nation has reached the highest stage.</p>`}</div></section>`;}
-function globalCard(){return `<section class="panel global-panel"><div class="paneltitle"><h2>Global Standing</h2><button class="textbtn">View All</button></div><div class="diplomacy">${icon('◎')}<span><b>Diplomacy</b><small>Allies</small></span><b>›</b></div>${[['US','United States','Friendly +20'],['◇','Eurasia','Neutral +12'],['★','Al-Sham','Neutral +8'],['◉','Veridian','Tense -14']].map((x,i)=>`<div class="relation"><b>${x[0]}</b><span>${x[1]}</span><small class="${i===3?'bad':''}">${x[2]}</small></div>`).join('')}</section>`;}
-function achievements(){const arr=[['⌂','Factory Built','Build your first factory','+10'],['◆','University','Build a university','+10'],['◉','First Export Deal','Trade internationally','+20'],['♟','Population Milestone','Reach 1 million population','+30'],['◎','Good Relations','Form an alliance','+15']];return `<section class="panel achievements"><div class="paneltitle"><h2>Achievements</h2><button class="textbtn">View All</button></div><div class="tabs"><button class="active">All</button><button>Trade</button><button>Relations</button></div>${arr.map((x,i)=>`<div><span class="achievementicon">${x[0]}</span><section><b>${x[1]}</b><small>${x[2]}</small></section><em>${i<1&&state.nation.assets.factory?x[3]:'+'+x[3].replace('+','')}</em></div>`).join('')}</section>`;}
+function storeCard(){const n=state.nation;return `<section class="panel store-panel"><div class="paneltitle"><h2>Development Store</h2><button class="textbtn" data-screen="store">View All</button></div><div class="tabs">${['All','Economic','Civic','Culture','Luxury'].map(x=>`<button type="button" data-store-filter="${x}" class="${x==='All'?'active':''}">${x}</button>`).join('')}</div><div class="storelist">${storeDefs.slice(0,6).map(d=>{const ok=level().level>=d.req,can=n.money>=d.cost;return `<div class="storeitem" data-store-category="${d.cat}"><img src="/${d.img}" alt=""><div><b>${d.name}</b><small>${d.desc}</small></div><strong>${money(d.cost)}</strong><button class="mini ${ok&&can?'greenbtn':'lockbtn'}" data-buy="${d.id}" ${ok&&can?'':'disabled'}>${ok?'Buy':'🔒'}</button></div>`}).join('')}</div></section>`;}
+function cityCard(){const n=state.nation,c=n.cities[0],cityCost=Math.round(1800000*Math.pow(1.48,Math.max(0,(c.level||1)-1)));const popDelta=Math.max(25,Math.round((c.pop||0)*.000012));return `<section class="panel city-panel"><div class="paneltitle"><h2>City Overview</h2><button class="textbtn" data-screen="cities">View All</button></div><div class="cityimage city3d" data-city-scene="${esc(c.name)}"><span>Lv. ${c.level}</span></div><div class="cityhead"><div><b>${esc(c.name)}</b><small>◉ Capital City</small></div></div><div class="citystats"><div>${icon('♟')}<small>Population</small><b>${fmt(c.pop/1e6)}M</b><em>+${fmt(popDelta)}/day</em></div><div>${icon('◉')}<small>Income</small><b>${money(c.income)}</b><em>Projected daily</em></div><div>${icon('♥')}<small>Happiness</small><b>${Math.round(c.happiness)}%</b><em>${Math.round(c.happiness)>=70?'Stable':'Improving'}</em></div></div><h3>City Buildings</h3>${['Residential Zone','Industrial Zone','Commercial Zone','Infrastructure'].map((x,i)=>`<div class="buildingrow"><div class="buildingbadge">${['⌂','▥','▣','◆'][i]}</div><div><b>${x}</b><small>${['Housing capacity','Jobs and production','Local trade','Road and utility capacity'][i]} · City Lv. ${c.level}</small></div><span class="rowvalue">Active</span></div>`).join('')}<button class="cityupgrade gold" data-action="open-city-builder" data-city-index="0">Open City Builder</button><button class="cityupgrade outline" data-action="cityup">Upgrade City · ${money(cityCost)}</button></section>`;}
+function progressCard(){const n=state.nation,l=level(),next=nextLevel(),maxCity=Math.max(1,...(n.cities||[]).map(c=>Number(c.level)||1));return `<section class="panel progress-panel"><div class="paneltitle"><h2>Nation Progress</h2><span>Derived from city development</span></div><div class="stage"><small>Current Stage</small><b>${l.name}</b><span>Lv. ${l.level}</span><div class="bar"><i style="width:${xpPct()}%"></i></div><em>Highest city: Level ${maxCity}</em></div><div class="next"><small>Next Promotion</small><h3>${next?next.name:'World-Class Nation'}</h3>${next?`<p>Grow at least one city to Level ${next.level}.</p><div>✓ City development</div><div>✓ National wealth</div><hr><p>Rewards:</p><div>Cash + reputation milestone reward</div><div>Higher national income multiplier</div><button class="gold" data-screen="progress">View Progression</button>`:`<p>Your nation has reached the highest stage.</p>`}</div></section>`;}
+
+function globalCard(){return `<section class="panel global-panel"><div class="paneltitle"><h2>Global Standing</h2><button class="textbtn" data-screen="diplomacy">View All</button></div><div class="diplomacy">${icon('◎')}<span><b>Diplomacy</b><small>Allies</small></span><b>›</b></div>${[['US','United States','Friendly +20'],['◇','Eurasia','Neutral +12'],['★','Al-Sham','Neutral +8'],['◉','Veridian','Tense -14']].map((x,i)=>`<div class="relation"><b>${x[0]}</b><span>${x[1]}</span><small class="${i===3?'bad':''}">${x[2]}</small></div>`).join('')}</section>`;}
+function achievements(){const arr=[['⌂','Factory Built','Build your first factory','+10'],['◆','University','Build a university','+10'],['◉','First Export Deal','Trade internationally','+20'],['♟','Population Milestone','Reach 1 million population','+30'],['◎','Good Relations','Form an alliance','+15']];return `<section class="panel achievements"><div class="paneltitle"><h2>Achievements</h2><button class="textbtn" data-screen="progress">View All</button></div><div class="tabs"><button type="button" data-achievement-filter="All" class="active">All</button><button type="button" data-achievement-filter="Trade">Trade</button><button type="button" data-achievement-filter="Relations">Relations</button></div>${arr.map((x,i)=>`<div data-achievement-category="${i===2?'Trade':i===3?'Relations':'All'}"><span class="achievementicon">${x[0]}</span><section><b>${x[1]}</b><small>${x[2]}</small></section><em>${i<1&&state.nation.assets.factory?x[3]:'+'+x[3].replace('+','')}</em></div>`).join('')}</section>`;}
 function lower(){const n=state.nation,l=level();return `<section class="panel national-progress"><div class="paneltitle"><h2>National Progression</h2></div><div class="nodes">${levels.map(x=>`<div class="node ${x.level<=l.level?'done':''} ${x.level===l.level?'current':''}"><span>${x.level<=l.level?'◆':'◇'}</span><b>${x.name.replace(' Nation','')}</b><small>Lv. ${x.level}</small></div>`).join('')}</div></section><section class="panel activity"><div class="paneltitle"><h2>Recent Activity</h2></div>${n.history.slice(0,4).map((x,i)=>`<div>${icon(['◉','◆','⌂','♟'][i])}<span>${esc(x)}</span><small>${i+1}h ago</small></div>`).join('')}</section><section class="panel buildtomorrow"><img src="/hero-art.jpg" alt="Clean city illustration"><div><h2>Build a greater tomorrow</h2><p>Your decisions shape the future of ${esc(n.name)}.</p><button class="gold" data-screen="map">View Map</button></div></section>`;}
-function cozyCard(){const n=state.nation,c=selectedCity(),z=cozyFor(n),ev=dailyEvent(n),d=internalDate(n);const tasks=z.tasks.map(id=>cozyMoments.find(x=>x.id===id)).filter(Boolean);const canEnd=z.activityUsed>=3&&!z.dayEnded;return `<section class="panel cozy-panel"><div class="paneltitle"><div><h2>Today in ${esc(c.name)}</h2><small>${d.season} · ${ev.icon} ${ev.title}</small></div><div class="dayactions"><span class="apbadge">${z.activityUsed}/10 AP</span>${canEnd?`<button class="gold endday" data-action="end-day">End Day →</button>`:''}</div></div><div class="daily-event"><b>${ev.icon} ${ev.title}</b><span>${ev.desc}</span></div><div class="citypick"><span>Visit</span><select data-city-select>${n.cities.map((x,i)=>`<option value="${i}" ${i===(z.selectedCity||0)?'selected':''}>${esc(x.name)}</option>`).join('')}</select><b>${Math.round(c.happiness||65)}% happy</b></div><div class="momentlist">${tasks.map(x=>{const done=z.done.includes(x.id),locked=z.activityUsed+(x.costAP||1)>10,can=n.money>=x.cost;return `<article class="moment ${done?'done':''}"><div class="momenticon">${x.icon}</div><div><b>${x.title}</b><small>${x.desc}</small><em>${x.costAP||1} AP · ${x.reward?`Earn ${money(x.reward)} · `:''}+${x.happy}% happiness</em></div><button class="mini ${done||locked?'lockbtn':'greenbtn'}" data-moment="${x.id}" ${done||locked||!can?'disabled':''}>${done?'Done':locked?'10 AP':can?'Do it':'Need '+money(x.cost)}</button></article>`}).join('')}</div><div class="dayfooter"><span>Do 3+ activities to unlock <b>End Day</b>.</span><span>Next year in ${30-d.dayOfYear} days</span></div></section>`;}
 function mailboxCard(){const n=state.nation,z=cozyFor(n),m=(z.mailbox||[]).slice(0,3);return `<section class="panel mailbox"><div class="paneltitle"><h2>📬 Mailbox</h2><span>${m.length} new notes</span></div>${m.length?m.map(x=>`<div class="mailrow"><span>${x.icon}</span><section><b>${esc(x.title)}</b><small>${esc(x.text)}</small></section></div>`).join(''):`<div class="emptybox">Your mailbox is quiet. Someone will write soon.</div>`}</section>`;}
 function reportCard(){const n=state.nation,z=cozyFor(n),r=z.lastReport;return `<section class="panel reportcard"><div class="paneltitle"><h2>🌙 Last Day</h2><span>${r?`Day ${r.day}`:'Not yet'}</span></div>${r?`<div class="reportgrid"><div><b>${money(r.earned)}</b><small>earned</small></div><div><b>${r.activities}</b><small>activities</small></div><div><b>${esc(r.season)}</b><small>season</small></div></div><p>${esc(r.event)} made the day feel a little different.</p>`:`<div class="emptybox">Finish your first day to see its little story here.</div>`}</section>`;}
-function collectionCard(){const n=state.nation,z=cozyFor(n),items=z.collection||[];return `<section class="panel collection"><div class="paneltitle"><h2>🎒 Nation Collection</h2><button class="textbtn" data-screen="history">Scrapbook</button></div><div class="collectgrid">${items.slice(-8).map((x,i)=>`<div title="Discovered on Day ${Math.max(1,z.dayIndex-i)}"><span>${x.startsWith('memory')?'📷':(cozyMoments.find(m=>m.id===x)?.icon||'✨')}</span><small>${x.startsWith('memory')?'Memory':'Keepsake'}</small></div>`).join('')||'<div class="emptybox">Little discoveries will appear here.</div>'}</div></section>`;}
-function cityBuilder(){const n=state.nation,c=selectedCity(),z=cozyFor(n),defs=BUILD_DEFS;return listPage('City Builder',`${esc(c.name)} — shape the city yourself.`,`<div class="builderlayout"><section class="builderworld panel"><div class="builderhead"><div><small>${esc(c.type)}</small><h2>${esc(c.name)}</h2><p>${fmt(c.pop/1e6)}M residents · Level ${c.level} · ${Math.round(c.happiness)}% happiness</p></div><div class="builderactions"><button class="outline" data-action="road">🛣️ Extend Road</button><button class="gold" data-action="cityup">⬆ Grow City</button></div></div><div class="builder3d city3d" data-city-scene="${esc(c.name)}"></div><div class="builderstats"><span>🏠 ${c.buildings?.filter(x=>BUILD_DEFS.find(d=>d.id===x.id)?.cat==='Residential').length||0} homes</span><span>💼 ${c.buildings?.reduce((a,x)=>a+(BUILD_DEFS.find(d=>d.id===x.id)?.jobs||0),0)||0} jobs</span><span>🛣️ ${c.roads||2} road links</span><span>🌳 ${c.zones?.park||0} green zones</span></div></section><section class="buildcatalog panel"><div class="paneltitle"><h2>Build</h2><span>Place something useful</span></div><div class="buildfilters">${['All','Residential','Commercial','Civic','Industrial','Nature','Infrastructure','Culture'].map(x=>`<button class="${x==='All'?'active':''}">${x}</button>`).join('')}</div><div class="buildgrid">${defs.map(d=>{const cost=buildCost(d,c),locked=(d.id==='university'&&c.level<4)||(d.cat==='Infrastructure'&&c.level<2);return `<article class="buildcard"><div class="buildicon">${d.icon}</div><div><b>${d.name}</b><small>${d.desc}</small><em>${money(cost)} · ${d.cat}</em></div><button class="mini ${locked?'lockbtn':'greenbtn'}" data-build="${d.id}" ${locked?'disabled':''}>${locked?'🔒':'Build'}</button></article>`}).join('')}</div></section><section class="zones panel"><div class="paneltitle"><h2>Plan the city</h2><span>Reserve space</span></div><div class="zonegrid">${ZONE_DEFS.map(x=>`<button class="zonebtn" data-zone="${x.id}"><b>${x.icon} ${x.name}</b><small>${x.effect}</small><em>${c.zones?.[x.id]||0} zones</em></button>`).join('')}</div></section></div>`);}
+function collectionCard(){const n=state.nation,z=cozyFor(n),items=z.collection||[];return `<section class="panel collection"><div class="paneltitle"><h2>🎒 Nation Collection</h2><button class="textbtn" data-screen="history">Scrapbook</button></div><div class="collectgrid">${items.slice(-8).map((x,i)=>`<div title="Discovered on Day ${Math.max(1,z.dayIndex-i)}"><span>${x.startsWith('memory')?'📷':(OPPORTUNITIES.find(m=>m.id===x)?.icon||'✨')}</span><small>${x.startsWith('memory')?'Memory':'Keepsake'}</small></div>`).join('')||'<div class="emptybox">Little discoveries will appear here.</div>'}</div></section>`;}
+function cityBuilder(){const n=state.nation,c=selectedCity(),z=cozyFor(n),defs=BUILD_DEFS;return listPage('City Builder',`${esc(c.name)} — shape the city yourself.`,`<div class="builderlayout"><section class="builderworld panel"><div class="builderhead"><div><small>${esc(c.type)}</small><h2>${esc(c.name)}</h2><p>${fmt(c.pop/1e6)}M residents · Level ${c.level} · ${Math.round(c.happiness)}% happiness</p></div><div class="builderactions"><button class="outline" data-action="road">🛣️ Extend Road</button><button class="gold" data-action="cityup">⬆ Grow City</button></div></div><div class="builder3d city3d" data-city-scene="${esc(c.name)}"></div><div class="builderstats"><span>🏠 ${c.buildings?.filter(x=>BUILD_DEFS.find(d=>d.id===x.id)?.cat==='Residential').length||0} homes</span><span>💼 ${c.buildings?.reduce((a,x)=>a+(BUILD_DEFS.find(d=>d.id===x.id)?.jobs||0),0)||0} jobs</span><span>🛣️ ${c.roads||2} road links</span><span>🌳 ${c.zones?.park||0} green zones</span></div></section><section class="buildcatalog panel"><div class="paneltitle"><h2>Build</h2><span>Place something useful</span></div><div class="buildfilters">${['All','Residential','Commercial','Civic','Industrial','Nature','Infrastructure','Culture'].map(x=>`<button type="button" data-build-filter="${x}" class="${x==='All'?'active':''}">${x}</button>`).join('')}</div><div class="buildgrid">${defs.map(d=>{const cost=buildCost(d,c),locked=(d.id==='university'&&c.level<4)||(d.cat==='Infrastructure'&&c.level<2);return `<article class="buildcard"><div class="buildicon">${d.icon}</div><div><b>${d.name}</b><small>${d.desc}</small><em>${money(cost)} · ${d.cat}</em></div><button class="mini ${locked?'lockbtn':'greenbtn'}" data-build="${d.id}" ${locked?'disabled':''}>${locked?'🔒':'Build'}</button></article>`}).join('')}</div></section><section class="zones panel"><div class="paneltitle"><h2>Plan the city</h2><span>Reserve space</span></div><div class="zonegrid">${ZONE_DEFS.map(x=>`<button class="zonebtn" data-zone="${x.id}"><b>${x.icon} ${x.name}</b><small>${x.effect}</small><em>${c.zones?.[x.id]||0} zones</em></button>`).join('')}</div></section></div>`);}
 function miniGameMarkup(g){
  const result=g.lastResult?`<div class="game-result ${g.lastResult}">${g.lastResult==='win'?'🎉 You won!':g.lastResult==='loss'?'😅 Not this time':'🤝 Draw — go again!'}</div>`:'';
  if(g.pendingResult){
@@ -439,9 +478,12 @@ function opportunityCard(){
 function home(){return `<main class="maincontent">${hero()}${opportunityCard()}<div class="cozyextras">${mailboxCard()}${reportCard()}${collectionCard()}</div><div class="dashboardgrid"><div>${skillsCard()}</div><div>${storeCard()}</div><div>${cityCard()}</div><div>${progressCard()}</div><div>${globalCard()}${achievements()}</div></div><div class="lowergrid">${lower()}</div></main>`;}
 function listPage(kicker,title,content){return `<main class="subpage"><div class="pagehead"><small>${kicker.toUpperCase()}</small><h1>${title}</h1><p>Manage this part of ${esc(state.nation.name)} with the same progression-driven simulation.</p></div>${content}</main>`;}
 function fullSkills(){return listPage('National Skills','Build your capabilities.',`<div class="fullskills">${skillsCard()}</div>`);}
+function fullDevelopment(){return listPage('Development','Improve the systems that power the nation.',`<div class="fullskills">${skillsCard()}</div><section class="panel"><div class="paneltitle"><h2>Development Effects</h2></div><div class="statsgrid">${skillDefs.map(d=>`<div><b>${d.name}</b><small>${d.effect}</small></div>`).join('')}</div></section>`);}
+function fullBuildings(){const n=state.nation,c=selectedCity();return listPage('Buildings','Review the buildings available to your cities.',`<section class="panel"><div class="paneltitle"><div><h2>${esc(c.name)}</h2><span>Choose a city from Cities → Build City to place buildings.</span></div></div><div class="buildgrid">${BUILD_DEFS.map(d=>`<article class="buildcard"><div class="buildicon">${d.icon}</div><div><b>${d.name}</b><small>${d.desc}</small><em>${money(buildCost(d,c))} · ${d.cat}</em></div></article>`).join('')}</div></section>`);}
 function fullStore(){return listPage('Development Store','Build the things that make a nation better.',`<div class="fullstore">${storeDefs.map(d=>{const n=state.nation,u=level().level>=d.req,can=n.money>=d.cost;return `<article class="bigstore"><img class="thumb" src="/${d.img}" alt=""><div><h2>${d.name}</h2><p>${d.desc}</p><small>+${money(d.inc)}/day · Requires Level ${d.req}</small></div><strong>${money(d.cost)}</strong><button class="gold" data-buy="${d.id}" ${!u||!can?'disabled':''}>${u?'Buy':'Locked'}</button></article>`}).join('')}</div>`);}
-function fullCities(){const n=state.nation;cozyFor(n);return listPage('Cities','Visit, grow and give each place its own personality.',`<div class="citiesfull">${n.cities.map((c,i)=>`<article class="citylarge ${i===(n.cozy.selectedCity||0)?'selectedcity':''}"><div class="citylarge3d city3d" data-city-scene="${esc(c.name)}"></div><div><div class="citytag">${esc(c.type)}</div><h2>${esc(c.name)}</h2><p>${fmt(c.pop/1e6)}M citizens · Level ${c.level} · ${Math.round(c.happiness||65)}% happiness</p><div class="citychips"><span>🏠 ${Math.max(4,c.level*3)} neighborhoods</span><span>🌳 ${Math.max(1,Math.floor(c.level/2)+1)} parks</span><span>✨ ${(c.cozy?.projects||[]).length} local projects</span></div><button class="gold" data-city-visit="${i}">Visit City</button> <button class="outline" data-action="open-city-builder" data-city-index="${i}">Build City</button> <button class="outline" data-action="cityup">Grow City</button></div></article>`).join('')}</div>`);}
-function fullProgress(){return listPage('Nation Progression','Watch your story unfold.',`<div class="fullprogress">${levels.map(x=>`<article class="pstage ${x.level<=level().level?'done':''}"><span>Lv.${x.level}</span><h2>${x.name}</h2><p>Unlock: ${x.unlock}</p><small>${x.xp.toLocaleString()} XP</small></article>`).join('')}</div>`);}
+function fullCities(){const n=state.nation;cozyFor(n);return listPage('Cities','Visit, grow and give each place its own personality.',`<div class="citiesfull">${n.cities.map((c,i)=>`<article class="citylarge ${i===(n.cozy.selectedCity||0)?'selectedcity':''}"><div class="citylarge3d city3d" data-city-scene="${esc(c.name)}"></div><div><div class="citytag">${esc(c.type)}</div><h2>${esc(c.name)}</h2><p>${fmt(c.pop/1e6)}M citizens · Level ${c.level} · ${Math.round(c.happiness||65)}% happiness</p><div class="citychips"><span>🏠 ${Math.max(4,c.level*3)} neighborhoods</span><span>🌳 ${Math.max(1,Math.floor(c.level/2)+1)} parks</span><span>✨ ${(c.cozy?.projects||[]).length} local projects</span></div><button class="gold" data-city-visit="${i}">Visit City</button> <button class="outline" data-action="open-city-builder" data-city-index="${i}">Build City</button> <button class="outline" data-action="cityup" data-city-index="${i}">Grow City</button></div></article>`).join('')}</div>`);}
+function fullProgress(){const l=level();return listPage('Nation Progression','Your nation level follows the strongest city.',`<div class="fullprogress">${levels.map(x=>`<article class="pstage ${x.level<=l.level?'done':''}"><span>Lv.${x.level}</span><h2>${x.name}</h2><p>Unlock: ${x.unlock}</p><small>${x.level<=l.level?'Unlocked':'Grow a city to Level '+x.level}</small></article>`).join('')}</div>`);}
+function fullStatistics(){const n=state.nation,l=level(),cities=n.cities||[],jobs=cities.reduce((a,c)=>a+(c.buildings||[]).reduce((s,b)=>s+(BUILD_DEFS.find(d=>d.id===b.id)?.jobs||0),0),0),avgHappy=cities.length?cities.reduce((a,c)=>a+(Number(c.happiness)||0),0)/cities.length:0;return listPage('Statistics','Numbers from the current simulation.',`<div class="statsgrid"><div><b>${money(income())}</b><small>Projected daily national income</small></div><div><b>${fmt(n.population)}</b><small>Population</small></div><div><b>${cities.length}</b><small>Settlements</small></div><div><b>Lv. ${l.level}</b><small>Nation level</small></div><div><b>${jobs}</b><small>Building jobs</small></div><div><b>${Math.round(avgHappy)}%</b><small>Average city happiness</small></div><div><b>${Math.round(n.reputation)}</b><small>Reputation</small></div><div><b>${(n.assets&&Object.values(n.assets).reduce((a,v)=>a+Number(v||0),0))||0}</b><small>National assets</small></div></div>`);}
 function fullMap(){
   const n=state.nation;
   return listPage('National Map','Your cities, towns, roads and countryside — one living country.',`<section class="mapscene panel">
@@ -638,6 +680,37 @@ function placeSpacedKenney(group,models,rng,count,zone,scaleRange={min:.7,max:1.
     }
   }
 }
+function cityGrid(radius){
+  const step=2.2;
+  const lines=[-4.4,-2.2,0,2.2,4.4].filter(v=>Math.abs(v)<=radius+.01);
+  const blocks=[];
+  for(let ix=0;ix<lines.length-1;ix++)for(let iz=0;iz<lines.length-1;iz++){
+    const x0=lines[ix]+.72,x1=lines[ix+1]-.72,z0=lines[iz]+.72,z1=lines[iz+1]-.72;
+    if(x1>x0&&z1>z0)blocks.push({x0,x1,z0,z1,cx:(x0+x1)/2,cz:(z0+z1)/2,ix,iz});
+  }
+  return {step,lines,blocks};
+}
+function placeInBlocks(group,models,rng,blocks,count,scaleMin,scaleMax,category){
+  if(!models.length||!blocks.length)return;
+  const used=[];
+  const shuffled=blocks.slice().sort(()=>rng()-.5);
+  for(let i=0;i<count;i++){
+    let placed=false;
+    for(let a=0;a<shuffled.length&&!placed;a++){
+      const b=shuffled[(i+a)%shuffled.length];
+      const src=models[Math.floor(rng()*models.length)];
+      const obj=cloneKenney(src); const scale=scaleMin+rng()*(scaleMax-scaleMin); obj.scale.setScalar(scale); obj.rotation.y=Math.floor(rng()*4)*Math.PI/2;
+      const bb=new THREE.Box3().setFromObject(obj),size=new THREE.Vector3();bb.getSize(size);
+      const margin=.10, hw=Math.max(.2,size.x/2+margin),hd=Math.max(.2,size.z/2+margin);
+      const xmin=b.x0+hw,xmax=b.x1-hw,zmin=b.z0+hd,zmax=b.z1-hd;
+      if(xmin>xmax||zmin>zmax)continue;
+      const x=xmin+rng()*(xmax-xmin),z=zmin+rng()*(zmax-zmin);
+      let clear=true;for(const q of used){if(Math.hypot(q.x-x,q.z-z)<q.r+Math.max(hw,hd)+.12){clear=false;break;}}
+      if(!clear)continue;
+      obj.position.set(x,.045,z);group.add(obj);used.push({x,z,r:Math.max(hw,hd)});placed=true;
+    }
+  }
+}
 function addKenneyCityAssets(group,seed,level,opts={}){
   const rng=seeded(seed),lvl=Math.max(1,Math.min(10,level)),radius=opts.radius||6.4;
   const city=new THREE.Group();city.name='Kenney City Districts';group.add(city);
@@ -646,90 +719,51 @@ function addKenneyCityAssets(group,seed,level,opts={}){
     loadAssetSet(LOCAL_ASSETS.towers),loadAssetSet(LOCAL_ASSETS.roads),loadAssetSet(LOCAL_ASSETS.nature)
   ]).then(([residential,commercial,industrial,towers,roads,nature])=>{
     const district=new THREE.Group();district.name='Built From Kenney Packs';city.add(district);
-    const worldR=radius;
+    const grid=cityGrid(radius);
     const rg=new THREE.Group();rg.name='Road Network';district.add(rg);
-    // Roads are a modular 1x1 Kenney system. Keep every connection on the
-    // same grid and reserve the blocks between roads exclusively for buildings.
-    const tile=2.18;
-    const roadLines=[-tile*2,0,tile*2];
-    const span=tile*3;
-    const addRoad=(src,x,z,rot=0)=>{
-      const m=cloneKenney(src);m.scale.setScalar(tile);m.rotation.y=rot;m.position.set(x,.035,z);rg.add(m);
-    };
-    roadLines.forEach(z=>{
-      for(let x=-span;x<=span;x+=tile){
-        const crossing=roadLines.some(v=>Math.abs(v-x)<.01);
-        if(!crossing)addRoad(roads[0],x,z,0);
+    const straight=roads.find(x=>x.endsWith('road-straight.glb'))||roads[0];
+    const intersection=roads.find(x=>x.endsWith('road-intersection.glb'))||roads[0];
+    const roadScale=2.2;
+    const lines=grid.lines;
+    if(!opts.national){
+      // A clean orthogonal street grid. Every tile is exactly one module wide;
+      // intersections replace straight tiles at crossings, so nothing stacks.
+      for(const z of lines)for(const x of lines){
+        const m=cloneKenney(intersection);m.scale.setScalar(roadScale);m.position.set(x,.035,z);rg.add(m);
       }
-    });
-    roadLines.forEach(x=>{
-      for(let z=-span;z<=span;z+=tile){
-        const crossing=roadLines.some(v=>Math.abs(v-z)<.01);
-        if(!crossing)addRoad(roads[0],x,z,Math.PI/2);
+      for(const z of lines)for(const x=-4.4;x<=4.4+.01;x+=roadScale){
+        if(lines.some(v=>Math.abs(v-x)<.01))continue;
+        const m=cloneKenney(straight);m.scale.setScalar(roadScale);m.rotation.y=Math.PI/2;m.position.set(x,.035,z);rg.add(m);
       }
-    });
-    roadLines.forEach(z=>roadLines.forEach(x=>addRoad(roads[2]||roads[0],x,z,0)));
-
-    // Build a set of genuine city blocks. No building placement is allowed on
-    // a road line; lots are generated inside the four inner blocks with fixed
-    // setbacks, producing streets -> sidewalks -> lots instead of random piles.
-    const blocks=[
-      {x0:-3.82,x1:-.54,z0:-3.82,z1:-.54},
-      {x0:.54,x1:3.82,z0:-3.82,z1:-.54},
-      {x0:-3.82,x1:-.54,z0:.54,z1:3.82},
-      {x0:.54,x1:3.82,z0:.54,z1:3.82}
-    ];
-    const lots=[];
-    blocks.forEach((b,bi)=>{
-      const cols=bi===0||bi===3?3:2, rows=3;
-      for(let r=0;r<rows;r++)for(let col=0;col<cols;col++){
-        const x=b.x0+(col+.5)*(b.x1-b.x0)/cols;
-        const z=b.z0+(r+.5)*(b.z1-b.z0)/rows;
-        lots.push([x,z,bi]);
+      for(const x of lines)for(const z=-4.4;z<=4.4+.01;z+=roadScale){
+        if(lines.some(v=>Math.abs(v-z)<.01))continue;
+        const m=cloneKenney(straight);m.scale.setScalar(roadScale);m.position.set(x,.035,z);rg.add(m);
       }
-    });
-    const shuffle=(arr)=>{for(let i=arr.length-1;i>0;i--){const j=Math.floor(rng()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}return arr;};
-    const homeLots=shuffle(lots.slice()).slice(0,Math.min(lots.length,8+lvl*2));
-    const homes=new THREE.Group();homes.name='Residential';district.add(homes);
-    homeLots.forEach((lot,i)=>{
-      const src=residential[Math.floor(rng()*residential.length)],b=cloneKenney(src);
-      b.scale.setScalar(.54+rng()*.12);b.rotation.y=(rng()>.5?Math.PI:0)+(rng()>.72?Math.PI/2:0);
-      b.position.set(lot[0],.04,lot[1]);homes.add(b);
-    });
-
-    if(lvl>=2){
-      const shops=new THREE.Group();shops.name='Commercial';district.add(shops);
-      const shopLots=[lots[2],lots[4],lots[7],lots[9]].filter(Boolean).slice(0,Math.min(2+lvl,4));
-      shopLots.forEach((lot,i)=>{const b=cloneKenney(commercial[(i+seed)%commercial.length]);b.scale.setScalar(.55);b.rotation.y=(i%4)*Math.PI/2;b.position.set(lot[0],.045,lot[1]);shops.add(b);});
-    }
-    if(lvl>=5&&towers.length){
-      const skyline=new THREE.Group();skyline.name='Downtown Skyline';district.add(skyline);
-      // Towers occupy the back corners of blocks, never road tiles.
-      [[-2.65,-2.65],[2.65,-2.65],[-2.65,2.65],[2.65,2.65]].slice(0,Math.min(1+Math.floor(lvl/2),4)).forEach((pos,i)=>{
-        const b=cloneKenney(towers[(i+seed)%towers.length]);b.scale.setScalar(.42);b.rotation.y=(i%4)*Math.PI/2;b.position.set(pos[0],.045,pos[1]);skyline.add(b);
-      });
-    }
-    if(lvl>=3){
-      const factories=new THREE.Group();factories.name='Industrial';district.add(factories);
-      // Industrial buildings are kept in a dedicated edge yard, away from
-      // residential lots and the main road corridors.
-      const industrialLots=[[-5.65,-2.0],[-5.65,0.1],[-5.65,2.2],[-4.95,2.9]];
-      industrialLots.slice(0,Math.min(2+Math.floor(lvl/2),4)).forEach((pos,i)=>{
-        const b=cloneKenney(industrial[(i+seed)%industrial.length]);b.scale.setScalar(.40);b.rotation.y=(i%2)*Math.PI/2;b.position.set(pos[0],.04,pos[1]);factories.add(b);
-      });
-    }
-    const green=new THREE.Group();green.name='Green Space';district.add(green);
-    const parks=Math.min(4,1+Math.floor(lvl/2));
-    const parkSpots=[[-1.35,-1.35],[1.35,-1.35],[-1.35,1.35],[1.35,1.35]];
-    for(let p=0;p<parks;p++){
-      const [cx,cz]=parkSpots[p];
-      for(let i=0;i<3+Math.floor(lvl/2);i++){
-        const t=cloneKenney(nature[Math.floor(rng()*nature.length)]);t.scale.setScalar(.30+rng()*.18);t.position.set(cx+(rng()-.5)*1.0,.035,cz+(rng()-.5)*1.0);t.rotation.y=rng()*Math.PI*2;green.add(t);
+      // Extra road investment extends the connected network toward the city edge.
+      const extra=Math.max(0,Math.min(4,Math.round((opts.roadLinks||2)-5)));
+      for(let e=0;e<extra;e++){
+        const edge=6.6+e*2.2;
+        for(const z of [-2.2,2.2]){const m=cloneKenney(straight);m.scale.setScalar(roadScale);m.position.set(edge,.035,z);rg.add(m);}
+        for(const x of [-2.2,2.2]){const m=cloneKenney(straight);m.scale.setScalar(roadScale);m.rotation.y=Math.PI/2;m.position.set(x,.035,edge);rg.add(m);}
       }
-    }
-  }).catch(err=>console.warn('Local Kenney assets failed to load',err));
+    } else rg.visible=false;
+    // Buildings are generated from the block interiors, never from world-wide random coordinates.
+    const commercialBlocks=grid.blocks.filter(b=>b.ix>=1&&b.ix<=2&&b.iz>=1&&b.iz<=2);
+    const industrialBlocks=grid.blocks.filter(b=>b.ix<=1&&b.iz>=2);
+    const towerBlocks=grid.blocks.filter(b=>b.ix>=2&&b.iz<=1);
+    const reserved=new Set([...commercialBlocks,...industrialBlocks,...towerBlocks].map(b=>`${b.ix}:${b.iz}`));(opts.blockedSlots||[]).forEach(slot=>{const b=grid.blocks[Number(slot)%grid.blocks.length];if(b)reserved.add(`${b.ix}:${b.iz}`);});
+    const residentialBlocks=grid.blocks.filter(b=>!reserved.has(`${b.ix}:${b.iz}`));
+    const homes=new THREE.Group();homes.name='Residential Blocks';district.add(homes);
+    const homeCount=opts.national?Math.min(5,Math.max(2,lvl)):Math.min(28,Math.max(6,8+lvl*2));
+    placeInBlocks(homes,residential,rng,residentialBlocks.length?residentialBlocks:grid.blocks,homeCount,opts.national?.32:.42,opts.national?.42:.62,'residential');
+    if(lvl>=2){const shops=new THREE.Group();shops.name='Commercial Blocks';district.add(shops);placeInBlocks(shops,commercial,rng,opts.national?grid.blocks:commercialBlocks,opts.national?Math.min(2,Math.floor(lvl/2)):Math.min(10,2+lvl),opts.national?.30:.42,opts.national?.40:.58,'commercial');}
+    if(lvl>=3&&!opts.national){const factories=new THREE.Group();factories.name='Industrial Blocks';district.add(factories);placeInBlocks(factories,industrial,rng,industrialBlocks,Math.min(8,2+lvl),.42,.55,'industrial');}
+    if(lvl>=5&&towers.length){const skyline=new THREE.Group();skyline.name='Downtown Skyline';district.add(skyline);placeInBlocks(skyline,towers,rng,opts.national?grid.blocks:towerBlocks,opts.national?1:Math.min(4,1+Math.floor(lvl/2)),opts.national?.28:.40,opts.national?.34:.50,'tower');}
+    const green=new THREE.Group();green.name='Green Spaces';district.add(green);
+    const parks=opts.national?0:Math.min(3,1+Math.floor(lvl/3));
+    grid.blocks.filter(b=>b.ix<=1&&b.iz<=1).slice(0,parks).forEach(b=>{for(let i=0;i<3+lvl;i++){const t=cloneKenney(nature[Math.floor(rng()*nature.length)]);t.scale.setScalar(.32+rng()*.18);t.position.set(b.cx+(rng()-.5)*.75,.035,b.cz+(rng()-.5)*.65);t.rotation.y=rng()*Math.PI*2;green.add(t);}});
+  }).catch(err=>console.warn('Local Kenney city assets failed to load',err));
 }
-
 function addCozyProjectVisuals(group,c){
   // Retired: the old procedural boxes conflicted with the Kenney visual language.
   // Existing projects remain represented by the real Kenney city districts below.
@@ -738,83 +772,40 @@ function addCozyProjectVisuals(group,c){
 function addBuiltStructures(group,c){
  const buildings=c.buildings||[];if(!buildings.length)return;
  const root=new THREE.Group();root.name='Player Built District';group.add(root);
- const map={
-   cottage:LOCAL_ASSETS.residential,
-   apartment:LOCAL_ASSETS.commercial,
-   shop:LOCAL_ASSETS.commercial,cafe:LOCAL_ASSETS.commercial,market:LOCAL_ASSETS.commercial,
-   school:LOCAL_ASSETS.commercial,clinic:LOCAL_ASSETS.commercial,museum:LOCAL_ASSETS.commercial,
-   workshop:LOCAL_ASSETS.industrial,warehouse:LOCAL_ASSETS.industrial,station:LOCAL_ASSETS.commercial,
-   stadium:LOCAL_ASSETS.commercial,university:LOCAL_ASSETS.commercial
- };
+ const map={cottage:LOCAL_ASSETS.residential,apartment:LOCAL_ASSETS.commercial,shop:LOCAL_ASSETS.commercial,cafe:LOCAL_ASSETS.commercial,market:LOCAL_ASSETS.commercial,school:LOCAL_ASSETS.commercial,clinic:LOCAL_ASSETS.commercial,museum:LOCAL_ASSETS.commercial,workshop:LOCAL_ASSETS.industrial,warehouse:LOCAL_ASSETS.industrial,station:LOCAL_ASSETS.commercial,stadium:LOCAL_ASSETS.commercial,university:LOCAL_ASSETS.commercial};
  const loads=[...new Set(Object.values(map).flat())];
- loadAssetSet(loads).then(()=>{
-   const loaded=new Map();loads.forEach((url,i)=>loaded.set(url,kenneyCache.get(url)));
+ loadAssetSet(loads).then(loaded=>{
+   const byUrl=new Map(loads.map((u,i)=>[u,loaded[i]]));
+   const grid=cityGrid(6.4); const slots=grid.blocks.slice();
    buildings.forEach((b,idx)=>{
-     const def=BUILD_DEFS.find(x=>x.id===b.id),urls=map[b.id];if(!def||!urls?.length)return;
-     const url=urls[idx%urls.length],src=kenneyCache.get(url);if(!src)return;
-     // Player-built structures use the same interior city blocks as the procedural city.
-     // Never use the legacy LOTS array here: several of its coordinates sit directly
-     // on the road centerlines.
-     const SAFE_BUILD_LOTS=[[-3.25,-3.25],[-1.55,-3.25],[1.55,-3.25],[3.25,-3.25],[-3.25,-1.55],[-1.55,-1.55],[1.55,-1.55],[3.25,-1.55],[-3.25,1.55],[-1.55,1.55],[1.55,1.55],[3.25,1.55],[-3.25,3.25],[-1.55,3.25],[1.55,3.25],[3.25,3.25]];
-     const lot=SAFE_BUILD_LOTS[b.slot%SAFE_BUILD_LOTS.length],g=cloneKenney(src);g.position.set(lot[0],.04,lot[1]);g.rotation.y=(idx%4)*Math.PI/2;
-     const scale=b.id==='cottage'?.62:b.id==='apartment'?.52:b.id==='stadium'?.42:.55;g.scale.setScalar(scale);g.userData.buildingId=b.id;root.add(g);
+     const urls=map[b.id],src=urls?.map(u=>byUrl.get(u)).find(Boolean);if(!src)return;
+     const block=slots[(Number.isFinite(b.slot)?b.slot:idx)%slots.length];
+     const g=cloneKenney(src);const scale=b.id==='cottage'?.48:b.id==='apartment'?.44:b.id==='stadium'?.40:b.id==='university'?.42:.46;
+     g.scale.setScalar(scale);g.rotation.y=(idx%4)*Math.PI/2;
+     const bb=new THREE.Box3().setFromObject(g),size=new THREE.Vector3();bb.getSize(size);
+     const x=clamp(block.cx,block.x0+size.x/2+.08,block.x1-size.x/2-.08);
+     const z=clamp(block.cz,block.z0+size.z/2+.08,block.z1-size.z/2-.08);
+     g.position.set(x,.045,z);g.userData.buildingId=b.id;root.add(g);
    });
- }).catch(()=>{});
+ }).catch(err=>console.warn('Built structure assets failed',err));
 }
-function addAmbientCitizens(group,c){
-  const rng=seeded(hashCity(`${c.name}:citizens:${c.pop||0}`));
-  const people=new THREE.Group();
-  people.name='Citizens';
-  group.add(people);
-
+function addAmbientCitizens(group,c,opts={}){
+  const people=new THREE.Group();people.name='Citizens';group.add(people);
+  if(opts.national)return people;
+  const rng=seeded(hashCity(`${c.name}:citizens:${c.citySeed||0}`));
   loadAssetSet(LOCAL_ASSETS.citizens).then(models=>{
-    // Population is represented directly: 1 visible citizen per 10,000 residents.
-    // Keep a reasonable upper bound for performance on large nations.
-    const population=Math.max(0,Number(c.pop)||0);
-    const count=Math.min(80,Math.max(1,Math.round(population/10000)));
-    const roadLines=[-4.36,0,4.36];
-    const paths=[];
-    // These are the actual center lines of the Kenney road grid.
-    roadLines.forEach(z=>paths.push({x0:-6.45,z0:z,x1:6.45,z1:z}));
-    roadLines.forEach(x=>paths.push({x0:x,z0:-6.45,x1:x,z1:6.45}));
-
-    const chooseTarget=(p,initial=false)=>{
-      const current=p.userData.walkPath;
-      let path=paths[Math.floor(rng()*paths.length)];
-      // Prefer a new road after reaching a destination so pedestrians naturally
-      // change streets instead of repeatedly walking the same segment.
-      if(current && paths.length>1){
-        for(let tries=0;tries<6 && path===current;tries++)path=paths[Math.floor(rng()*paths.length)];
-      }
-      const forward=rng()>.5;
-      p.userData.walkPath=path;
-      p.userData.walkForward=forward;
-      p.userData.walkTX=forward?path.x1:path.x0;
-      p.userData.walkTZ=forward?path.z1:path.z0;
-      if(initial){
-        const t=.12+rng()*.76;
-        p.position.x=path.x0+(path.x1-path.x0)*(forward?t:1-t);
-        p.position.z=path.z0+(path.z1-path.z0)*(forward?t:1-t);
-      }
-    };
-
+    const count=Math.max(1,Math.round(Math.max(1,c.pop||0)/10000));
+    const lines=[-4.4,-2.2,0,2.2,4.4];
+    const paths=[];for(const z of lines)paths.push([ -4.4,z,4.4,z ]);for(const x of lines)paths.push([ x,-4.4,x,4.4 ]);
     for(let i=0;i<count;i++){
-      const src=models[Math.floor(rng()*models.length)];
-      const p=cloneKenney(src);
-      // Smaller than the previous implementation, but still clearly visible.
-      p.scale.setScalar(.065+rng()*.012);
-      chooseTarget(p,true);
-      p.position.y=.02;
-      p.userData.walkSpeed=.65+rng()*.35; // world units / second
-      p.userData.walkLast=performance.now();
-      p.rotation.y=Math.atan2(p.userData.walkTX-p.position.x,p.userData.walkTZ-p.position.z);
-      people.add(p);
+      const p=cloneKenney(models[i%models.length]);p.scale.setScalar(.045+rng()*.008);
+      const path=paths[i%paths.length];const t=rng();const reverse=rng()>.5;
+      const sx=reverse?path[2]:path[0],sz=reverse?path[3]:path[1],tx=reverse?path[0]:path[2],tz=reverse?path[1]:path[3];
+      p.position.set(sx+(tx-sx)*t,.03,sz+(tz-sz)*t);p.userData.walkTX=tx;p.userData.walkTZ=tz;p.userData.walkSpeed=.0010+rng()*.0007;p.userData.walkPath=path;p.userData.walkReverse=reverse;p.rotation.y=Math.atan2(tx-sx,tz-sz);people.add(p);
     }
-    people.userData.ready=true;
   }).catch(err=>console.warn('Citizen assets failed to load',err));
   return people;
 }
-
 function buildCityScene(host,c,opts={}){
   if(!host||!c)return null;
   const width=host.clientWidth||640,height=host.clientHeight||320;
@@ -825,38 +816,12 @@ function buildCityScene(host,c,opts={}){
   const group=new THREE.Group();scene.add(group);
   const ground=new THREE.Mesh(new THREE.PlaneGeometry(22,18),new THREE.MeshStandardMaterial({color:style.ground,roughness:1}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;group.add(ground);
   const lvl=Math.max(1,Math.min(10,c.level||1)),seed=c.citySeed||citySeed(c);
-  addKenneyCityAssets(group,seed,lvl,{radius:6.4});
+  addKenneyCityAssets(group,seed,lvl,{radius:6.4,roadLinks:c.roads||2,blockedSlots:(c.buildings||[]).map(b=>Number(b.slot)||0)});
   addBuiltStructures(group,c);
   addCozyProjectVisuals(group,c);
   addAmbientCitizens(group,c);
   let dragging=false,lastX=0,lastY=0;renderer.domElement.style.touchAction='none';renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;renderer.domElement.setPointerCapture?.(e.pointerId)});renderer.domElement.addEventListener('pointerup',e=>{dragging=false;renderer.domElement.releasePointerCapture?.(e.pointerId)});renderer.domElement.addEventListener('pointercancel',()=>dragging=false);renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;group.rotation.y+=(e.clientX-lastX)*.008;group.rotation.x=THREE.MathUtils.clamp(group.rotation.x+(e.clientY-lastY)*.004,-.35,.25);lastX=e.clientX;lastY=e.clientY});
   const rec={renderer,scene,camera,group,host};citySceneRecords.push(rec);return rec;
-}
-
-function addNationalCityFootprint(group,seed,level){
-  const rng=seeded(seed),lvl=Math.max(1,Math.min(10,level));
-  const root=new THREE.Group();root.name='National City Footprint';group.add(root);
-  const buildingUrls=[...LOCAL_ASSETS.residential,...(lvl>=2?LOCAL_ASSETS.commercial:[]),...(lvl>=4?LOCAL_ASSETS.towers:[])];
-  loadAssetSet(buildingUrls).then(models=>{
-    const count=Math.min(22,5+lvl*2);
-    // A compact footprint around the city marker. No local road tiles here.
-    const positions=[];
-    for(let i=0;i<count;i++){
-      let accepted=false;
-      for(let attempt=0;attempt<40&&!accepted;attempt++){
-        const x=(rng()-.5)*4.0,z=(rng()-.5)*3.2;
-        if(Math.hypot(x,z)<.42)continue;
-        const clear=positions.every(p=>Math.hypot(p[0]-x,p[1]-z)>.62);
-        if(!clear)continue;
-        positions.push([x,z]);accepted=true;
-        const src=models[Math.floor(rng()*models.length)],b=cloneKenney(src);
-        const isTower=src?.userData?.__tower;
-        b.scale.setScalar((lvl>=4 && i<Math.floor(count*.22)) ? .28 : .22+rng()*.06);
-        b.rotation.y=Math.floor(rng()*4)*Math.PI/2;
-        b.position.set(x,.035,z);root.add(b);
-      }
-    }
-  }).catch(err=>console.warn('National city footprint failed',err));
 }
 
 function buildNationalScene(host){
@@ -891,20 +856,13 @@ function buildNationalScene(host){
 
   const roadMat=new THREE.MeshStandardMaterial({color:0x27383c,roughness:.94});
   const railMat=new THREE.MeshStandardMaterial({color:0x9c8769,roughness:.8});
-  function route(points,width,mat,y=.04){
-    const curve=new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(p[0],y,p[1])));
-    const geo=new THREE.BufferGeometry().setFromPoints(curve.getPoints(48));
-    const lineMat=mat instanceof THREE.MeshStandardMaterial
-      ? new THREE.LineBasicMaterial({color:mat.color.getHex(),transparent:true,opacity:.78})
-      : mat;
-    const mesh=new THREE.Line(geo,lineMat); world.add(mesh); return mesh;
+  function route(points,width,mat,y=.035){
+    const pts=points.map(p=>new THREE.Vector3(p[0],y,p[1]));
+    for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1],dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);const mesh=new THREE.Mesh(new THREE.BoxGeometry(Math.max(.25,len),.035,width*2),mat);mesh.position.set((a.x+b.x)/2,y,(a.z+b.z)/2);mesh.rotation.y=-Math.atan2(dz,dx);world.add(mesh);}
   }
-  // National highways and rail corridors.
-  route([[-13,-2],[-8,-1],[-3,-2],[2,-1],[7,1],[13,2]],.12,roadMat);
-  route([[-9,8],[-6,4],[-2,2],[2,-1],[6,-5],[10,-9]],.10,roadMat);
-  route([[-11,5],[-6,3],[-1,4],[5,5],[12,7]],.075,roadMat);
-  route([[-10,-8],[-5,-5],[0,-3],[5,0],[9,5],[12,9]],.045,railMat,.06);
-  route([[-12,5],[-7,2],[-2,0],[3,-1],[8,-2],[12,-1]],.045,railMat,.06);
+  route([[-12,-2],[-6,-2],[0,-1],[6,0],[12,1]],.09,roadMat);
+  route([[-10,6],[-4,4],[2,1],[8,-3],[12,-6]],.075,roadMat);
+  route([[-10,-7],[-4,-5],[2,-3],[8,0],[12,4]],.035,railMat,.055);
 
   // Every real city becomes a visible urban footprint on the national map.
   const cities=state.nation.cities||[];
@@ -934,30 +892,14 @@ function buildNationalScene(host){
     positions.push([x,z]);
     const cityGroup=new THREE.Group(); cityGroup.position.set(x,.06,z);
     const cLvl=Math.max(1,Math.min(10,c.level||1));
-    // National view is an abstraction: show a compact urban cluster, not the
-    // city's entire local road grid. Local roads/buildings remain confined to
-    // the dedicated city view.
-    addNationalCityFootprint(cityGroup,c.citySeed||citySeed(c),cLvl);
-    cityGroup.scale.setScalar(.42+Math.min(cLvl,8)*.018);
+    // The national map uses the same bundled Kenney vocabulary as the city view.
+    // Cities are placed inside their own footprints so national infrastructure can live outside them.
+    addKenneyCityAssets(cityGroup,c.citySeed||citySeed(c),cLvl,{radius:3.1,national:true});
+    cityGroup.scale.setScalar(.38+Math.min(cLvl,8)*.015);
     world.add(cityGroup);
     // city glow/marker
     const ring=new THREE.Mesh(new THREE.RingGeometry(.55,.64,24),new THREE.MeshBasicMaterial({color:i===0?0xe5c36a:0x7bc7cc,transparent:true,opacity:.72,side:THREE.DoubleSide}));
     ring.rotation.x=-Math.PI/2; ring.position.set(x,.16,z); world.add(ring);
-    const beacon=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,.65,8),new THREE.MeshBasicMaterial({color:i===0?0xe5c36a:0x7bc7cc}));
-    beacon.position.set(x,.38,z); world.add(beacon);
-  });
-  // Small settlements are intentionally sparse and are placed only in open countryside.
-  // They are not allowed to become a second city-road network.
-  loadAssetSet(LOCAL_ASSETS.residential).then(villagers=>{
-    for(let i=0;i<Math.max(4,Math.min(10,cities.length+3));i++){
-      const x=(rng()-.5)*23,z=(rng()-.5)*15;
-      const settlement=new THREE.Group();settlement.position.set(x,.04,z);
-      for(let h=0;h<1+(i%2);h++){
-        const b=cloneKenney(villagers[(i+h)%villagers.length]);
-        b.scale.setScalar(.13+rng()*.035);b.position.set((rng()-.5)*.45,.04,(rng()-.5)*.4);b.rotation.y=rng()*Math.PI*2;settlement.add(b);
-      }
-      world.add(settlement);
-    }
   });
 
   // National Store landmarks occupy a separate western/eastern corridor. They never sit on city footprints.
@@ -965,8 +907,12 @@ function buildNationalScene(host){
   const assetFor={factory:LOCAL_ASSETS.industrial,railway:LOCAL_ASSETS.industrial,airport:LOCAL_ASSETS.commercial,hospital:LOCAL_ASSETS.commercial,stadium:LOCAL_ASSETS.commercial,university:LOCAL_ASSETS.commercial,research:LOCAL_ASSETS.commercial,finance:LOCAL_ASSETS.commercial};
   const placedNational=new THREE.Group();placedNational.name='National Infrastructure';world.add(placedNational);
   const nationalLoads=[...new Set(Object.values(assetFor).flat())];
-  loadAssetSet(nationalLoads).then(()=>{
-    Object.entries(nationalSlots).forEach(([id,pos])=>{const amount=Number(state.nation.assets?.[id]||0);const urls=assetFor[id];for(let k=0;k<amount;k++){const src=kenneyCache.get(urls[k%urls.length]);if(!src)continue;const g=cloneKenney(src);g.position.set(pos[0]+(k%3)*1.15,.045,pos[1]+Math.floor(k/3)*1.15);g.rotation.y=((k+id.length)%4)*Math.PI/2;g.scale.setScalar(id==='stadium'?.40:id==='factory'?.48:.43);placedNational.add(g);}});
+  loadAssetSet(nationalLoads).then(loaded=>{
+    const byUrl=new Map(nationalLoads.map((u,i)=>[u,loaded[i]]));
+    const candidates=[[-10,-7],[-7,7],[10,7],[10,-6],[-9,3],[7,-8],[0,9],[0,-9],[-12,0],[12,0]];
+    const cityPos=positions.slice();let cursor=0;
+    const farEnough=(x,z)=>cityPos.every(([cx,cz])=>Math.hypot(x-cx,z-cz)>2.5);
+    Object.entries(nationalSlots).forEach(([id,_])=>{const amount=Number(state.nation.assets?.[id]||0);const urls=assetFor[id];for(let k=0;k<amount;k++){let pos=null;for(let tries=0;tries<candidates.length;tries++){const cnd=candidates[(cursor++)%candidates.length];if(farEnough(cnd[0],cnd[1])){pos=cnd;break;}}if(!pos)continue;const src=byUrl.get(urls[k%urls.length]);if(!src)continue;const g=cloneKenney(src);g.position.set(pos[0]+(k%2)*.9,.045,pos[1]+Math.floor(k/2)*.9);g.rotation.y=((k+id.length)%4)*Math.PI/2;g.scale.setScalar(id==='stadium'?.40:id==='factory'?.48:.43);placedNational.add(g);}});
   });
 
   // Interaction: drag to rotate/inspect the whole country.
@@ -979,52 +925,24 @@ function buildNationalScene(host){
   const rec={renderer,scene,camera,group:world,host};
   citySceneRecords.push(rec); return rec;
 }
-function initCityScenes(){disposeCityScenes();if(!state.nation)return;const hosts=$$('[data-city-scene]');const primary=hosts.slice(0,2);primary.forEach(host=>{const name=host.dataset.cityScene;const c=state.nation.cities.find(x=>x.name===name);if(c)buildCityScene(host,c)});const nationHost=$('#nation-city-scene');if(nationHost){buildNationalScene(nationHost);}const animate=()=>{
-    if(!citySceneRecords.length)return;
-    const now=performance.now();
-    citySceneRecords.forEach(r=>{
-      if(!(r.group&&r.host.offsetWidth>0&&r.host.offsetHeight>0))return;
-      r.group.rotation.y+=.0007;
-      r.group.traverse(o=>{
-        if(o.name!=='Citizens'||!o.userData.ready)return;
-        o.children.forEach(p=>{
-          if(p.userData.walkTX===undefined)return;
-          const last=p.userData.walkLast||now;
-          const dt=Math.min(.05,Math.max(0,(now-last)/1000));
-          p.userData.walkLast=now;
-          let dx=p.userData.walkTX-p.position.x;
-          let dz=p.userData.walkTZ-p.position.z;
-          let dist=Math.hypot(dx,dz);
-          if(dist<.10){
-            const paths=[
-              {x0:-6.45,z0:-4.36,x1:6.45,z1:-4.36},{x0:-6.45,z0:0,x1:6.45,z1:0},{x0:-6.45,z0:4.36,x1:6.45,z1:4.36},
-              {x0:-4.36,z0:-6.45,x1:-4.36,z1:6.45},{x0:0,z0:-6.45,x1:0,z1:6.45},{x0:4.36,z0:-6.45,x1:4.36,z1:6.45}
-            ];
-            const current=p.userData.walkPath;
-            let next=paths[Math.floor(Math.random()*paths.length)];
-            for(let i=0;i<5&&next===current;i++)next=paths[Math.floor(Math.random()*paths.length)];
-            p.userData.walkPath=next;
-            const forward=Math.random()>.5;
-            p.userData.walkTX=forward?next.x1:next.x0;
-            p.userData.walkTZ=forward?next.z1:next.z0;
-            dx=p.userData.walkTX-p.position.x;dz=p.userData.walkTZ-p.position.z;dist=Math.hypot(dx,dz);
-          }
-          const step=(p.userData.walkSpeed||.8)*dt;
-          const len=dist||1;
-          p.position.x+=dx/len*Math.min(step,dist);
-          p.position.z+=dz/len*Math.min(step,dist);
-          p.position.y=.02;
-          p.rotation.y=Math.atan2(dx,dz);
-        });
-      });
-      r.renderer.render(r.scene,r.camera);
-    });
-    window.__cityFrame=requestAnimationFrame(animate);
-  };
-  cancelAnimationFrame(window.__cityFrame);
-  window.__cityFrame=requestAnimationFrame(animate);
-}
-function renderGame(){tick();disposeHeroScene();const root=$('#app');let body=home();if(state.screen==='skills')body=fullSkills();else if(['store','development','buildings'].includes(state.screen))body=fullStore();else if(state.screen==='cities')body=fullCities();else if(state.screen==='citybuilder')body=cityBuilder();else if(['statistics','progress'].includes(state.screen))body=fullProgress();else if(state.screen==='map')body=fullMap();else if(state.screen==='history')body=fullHistory();else if(state.screen==='settings')body=fullSettings();else if(state.screen==='diplomacy')body=placeholder('Global Standing','Diplomacy and relations.');root.innerHTML=`<div class="game ${state.ui?.sidebarCollapsed?'sidebar-collapsed':''}"><div class="sidebarwrap">${sidebar()}</div><div class="gamearea">${topbar()}${mobileStatus()}${body}</div></div>${state.toast?`<div class="toast">${esc(state.toast)}</div>`:''}`;requestAnimationFrame(()=>{initHeroScene();initCityScenes()});}
+function initCityScenes(){disposeCityScenes();if(!state.nation)return;const hosts=$$('[data-city-scene]');const primary=hosts.slice(0,2);primary.forEach(host=>{const name=host.dataset.cityScene;const c=state.nation.cities.find(x=>x.name===name);if(c)buildCityScene(host,c)});const nationHost=$('#nation-city-scene');if(nationHost){buildNationalScene(nationHost);}const animate=()=>{if(!citySceneRecords.length)return;citySceneRecords.forEach(r=>{if(r.group&&r.host.offsetWidth>0&&r.host.offsetHeight>0){r.group.rotation.y+=.0007;r.group.traverse(o=>{if(o.name==='Citizens'){o.children.forEach(p=>{
+        if(p.userData.walkTX===undefined)return;
+        const dt=Math.min(32,performance.now()-(p.userData.lastWalkTime||performance.now()));
+        p.userData.lastWalkTime=performance.now();
+        let dx=p.userData.walkTX-p.position.x,dz=p.userData.walkTZ-p.position.z;
+        const dist=Math.hypot(dx,dz);
+        if(dist<.08){
+          const path=p.userData.walkPath;
+          p.userData.walkTX=path[0] + (path[2]-path[0])*(Math.random()>.5?0:1);
+          p.userData.walkTZ=path[1] + (path[3]-path[1])*(Math.random()>.5?0:1);
+          dx=p.userData.walkTX-p.position.x;dz=p.userData.walkTZ-p.position.z;
+        }
+        const step=p.userData.walkSpeed*dt;
+        const len=Math.hypot(dx,dz)||1;
+        p.position.x+=dx/len*step;p.position.z+=dz/len*step;p.position.y=.025;
+        p.rotation.y=Math.atan2(dx,dz);
+      });}});r.renderer.render(r.scene,r.camera)}});window.__cityFrame=requestAnimationFrame(animate)};cancelAnimationFrame(window.__cityFrame);window.__cityFrame=requestAnimationFrame(animate)}
+function renderGame(){tick();disposeHeroScene();const root=$('#app');let body=home();if(state.screen==='skills')body=fullSkills();else if(state.screen==='development')body=fullDevelopment();else if(state.screen==='buildings')body=fullBuildings();else if(state.screen==='store')body=fullStore();else if(state.screen==='cities')body=fullCities();else if(state.screen==='citybuilder')body=cityBuilder();else if(state.screen==='statistics')body=fullStatistics();else if(state.screen==='progress')body=fullProgress();else if(state.screen==='map')body=fullMap();else if(state.screen==='history')body=fullHistory();else if(state.screen==='settings')body=fullSettings();else if(state.screen==='diplomacy')body=placeholder('Global Standing','Diplomacy and relations.');root.innerHTML=`<div class="game ${state.ui?.sidebarCollapsed?'sidebar-collapsed':''}"><div class="sidebarwrap">${sidebar()}</div><div class="gamearea">${topbar()}${mobileStatus()}${body}</div></div>${state.toast?`<div class="toast">${esc(state.toast)}</div>`:''}`;requestAnimationFrame(()=>{initHeroScene();initCityScenes()});}
 
 let landingRenderer,landingScene,landingCamera,landingGlobe,landingFrame;
 function disposeLanding(){if(landingFrame)cancelAnimationFrame(landingFrame);landingFrame=null;if(landingRenderer)landingRenderer.dispose();landingRenderer=null;landingScene=null;landingCamera=null;landingGlobe=null;}
@@ -1036,7 +954,9 @@ function renderCreator(){disposeLanding();$('#app').innerHTML=`<main class="crea
 let navSwipe=false,navStartX=0,navStartY=0;
 document.addEventListener('touchstart',e=>{const nav=e.target.closest('.sidebar nav');if(!nav)return;const t=e.touches[0];navSwipe=false;navStartX=t.clientX;navStartY=t.clientY;},{passive:true});
 document.addEventListener('touchmove',e=>{const nav=e.target.closest('.sidebar nav');if(!nav)return;const t=e.touches[0];if(Math.abs(t.clientX-navStartX)>10&&Math.abs(t.clientX-navStartX)>Math.abs(t.clientY-navStartY))navSwipe=true;},{passive:true});
-document.addEventListener('click',e=>{if(e.isTrusted){ensureAudio();if(!e.target.closest('[data-action=toggle-sound]'))sfx('click');}if(navSwipe&&e.target.closest('.sidebar nav')){navSwipe=false;e.preventDefault();e.stopPropagation();return;}const b=e.target.closest('[data-screen],[data-action],[data-skill],[data-buy],[data-moment],[data-opportunity],[data-build],[data-zone],[data-city-visit],[data-game-action]');if(!b)return;if(b.dataset.screen){state.screen=b.dataset.screen;state.ui=state.ui||{};state.ui.mobileNav=false;save();renderGame();return}if(b.dataset.skill){upgradeSkill(b.dataset.skill);return}if(b.dataset.buy){buyAsset(b.dataset.buy);return}if(b.dataset.moment){return}if(b.dataset.opportunity){beginOpportunity(b.dataset.opportunity);return}if(b.dataset.gameAction){miniGameAction(b.dataset.gameAction,b.dataset.gameValue);return}if(b.dataset.build){buildInCity(b.dataset.build);return}if(b.dataset.zone){zoneCity(b.dataset.zone);return}if(b.dataset.cityVisit){visitCity(Number(b.dataset.cityVisit));return}if(b.dataset.screen==='cities'&&e.target.closest('[data-city-select]'))return;const a=b.dataset.action;if(a==='toggle-sound'){toggleSound();return}if(a==='close-activity-result'){closeActivityResult();return}if(a==='toggle-sidebar'){state.ui=state.ui||{};if(window.innerWidth<=980){state.ui.mobileNav=!state.ui.mobileNav;}else{state.ui.sidebarCollapsed=!state.ui.sidebarCollapsed;}save();renderGame();return}if(a==='close-mobile-nav'){state.ui.mobileNav=false;save();renderGame();return}if(a==='end-day'){endDay();return}if(a==='create')renderCreator();else if(a==='new')newNation();else if(a==='backlanding'){state.screen='landing';showLanding();}else if(a==='cityup')upgradeCity();else if(a==='collect')collectAway();else if(a==='continue')continuePlaying();else if(a==='road')addRoadToCity();else if(a==='cityup')upgradeCity();else if(a==='open-city-builder'){chooseCity(Number(b.dataset.cityIndex)||0);state.screen='citybuilder';save();renderGame();}else if(a==='advance-opportunity')advanceOpportunity();else if(a==='finish-opportunity')finishOpportunity();else if(a==='cancel-opportunity')cancelOpportunity();else if(a==='forge')createNation();else if(a==='save'){save();toast('Game saved');}});
+document.addEventListener('click',e=>{if(e.isTrusted){ensureAudio();if(!e.target.closest('[data-action=toggle-sound]'))sfx('click');}if(navSwipe&&e.target.closest('.sidebar nav')){navSwipe=false;e.preventDefault();e.stopPropagation();return;}const filter=e.target.closest('[data-build-filter]');if(filter){const wrap=filter.closest('.builderlayout')||document;wrap.querySelectorAll('[data-build-filter]').forEach(x=>x.classList.toggle('active',x===filter));const val=filter.dataset.buildFilter;wrap.querySelectorAll('.buildcard').forEach(card=>{const em=card.querySelector('em');const cat=em?.textContent?.split('·')[1]?.trim();card.style.display=(val==='All'||cat===val)?'':'none';});return;}const storeFilter=e.target.closest('[data-store-filter]');if(storeFilter){const wrap=storeFilter.closest('.store-panel')||document;wrap.querySelectorAll('[data-store-filter]').forEach(x=>x.classList.toggle('active',x===storeFilter));const val=storeFilter.dataset.storeFilter;wrap.querySelectorAll('[data-store-category]').forEach(card=>card.style.display=(val==='All'||card.dataset.storeCategory===val)?'':'none');return;}const achFilter=e.target.closest('[data-achievement-filter]');if(achFilter){const wrap=achFilter.closest('.achievements')||document;wrap.querySelectorAll('[data-achievement-filter]').forEach(x=>x.classList.toggle('active',x===achFilter));const val=achFilter.dataset.achievementFilter;wrap.querySelectorAll('[data-achievement-category]').forEach(card=>card.style.display=(val==='All'||card.dataset.achievementCategory===val)?'':'none');return;}const b=e.target.closest('[data-screen],[data-action],[data-skill],[data-buy],[data-opportunity],[data-build],[data-zone],[data-city-visit],[data-game-action]');if(!b)return;if(b.dataset.screen){state.screen=b.dataset.screen;state.ui=state.ui||{};state.ui.mobileNav=false;save();renderGame();return}if(b.dataset.skill){upgradeSkill(b.dataset.skill);return}if(b.dataset.buy){buyAsset(b.dataset.buy);return}if(b.dataset.opportunity){beginOpportunity(b.dataset.opportunity);return}if(b.dataset.gameAction){miniGameAction(b.dataset.gameAction,b.dataset.gameValue);return}if(b.dataset.build){buildInCity(b.dataset.build);return}if(b.dataset.zone){zoneCity(b.dataset.zone);return}if(b.dataset.cityVisit){visitCity(Number(b.dataset.cityVisit));return}if(b.dataset.screen==='cities'&&e.target.closest('[data-city-select]'))return;const a=b.dataset.action;if(a==='toggle-sound'){toggleSound();return}if(a==='close-activity-result'){closeActivityResult();return}if(a==='toggle-sidebar'){state.ui=state.ui||{};if(window.innerWidth<=980){state.ui.mobileNav=!state.ui.mobileNav;}else{state.ui.sidebarCollapsed=!state.ui.sidebarCollapsed;}save();renderGame();return}if(a==='close-mobile-nav'){state.ui.mobileNav=false;save();renderGame();return}if(a==='end-day'){endDay();return}if(a==='create')renderCreator();else if(a==='new')newNation();else if(a==='backlanding'){state.screen='landing';showLanding();}else if(a==='cityup')upgradeCity(b.dataset.cityIndex??null);else if(a==='collect')collectAway();else if(a==='continue')continuePlaying();else if(a==='road')addRoadToCity();else if(a==='cityup')upgradeCity(b.dataset.cityIndex??null);else if(a==='open-city-builder'){chooseCity(Number(b.dataset.cityIndex)||0);state.screen='citybuilder';save();renderGame();}else if(a==='advance-opportunity')advanceOpportunity();else if(a==='finish-opportunity')finishOpportunity();else if(a==='cancel-opportunity')cancelOpportunity();else if(a==='forge')createNation();else if(a==='save'){save();toast('Game saved');}});
 document.addEventListener('change',e=>{const s=e.target.closest('[data-city-select]');if(s){chooseCity(Number(s.value));}});
-setInterval(()=>{if(state.nation){tick();save();}},1000);
+let saveTimer=null;
+function queueSave(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>save(),450);}
+
 if(state.nation)showGame();else showLanding();
