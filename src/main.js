@@ -336,7 +336,7 @@ function upgradeSkill(id){const n=state.nation,c=skillCost(id),d=skillDefs.find(
 function buyAsset(id){const n=state.nation,d=storeDefs.find(x=>x.id===id);if(!d)return;if(level().level<d.req)return toast(`Reach Level ${d.req} to unlock this.`);if(!Number.isFinite(d.cost)||d.cost<0)return toast('This purchase cost could not be calculated.');if(n.money<d.cost)return toast('Not enough national wealth.');n.money=Math.max(0,Math.round(n.money-d.cost));n.assets[id]=(n.assets[id]||0)+1;n.xp+=Math.round(d.cost/20000);if(id==='stadium')n.happiness=Math.min(100,n.happiness+3);if(id==='hospital')n.happiness=Math.min(100,n.happiness+4);if(id==='finance')n.reputation+=4;n.history.unshift(`${d.name} was built in ${n.name}.`);save();toast(`${d.name} built`);renderGame();}
 function upgradeCity(){const n=state.nation,c=selectedCity(),cost=Math.round(1800000*Math.pow(1.48,Math.max(0,(c.level||1)-1)));if(!Number.isFinite(cost)||cost<0)return toast('This city upgrade cost could not be calculated.');if(n.money<cost)return toast('Not enough wealth to upgrade this city.');n.money=Math.max(0,Math.round(n.money-cost));c.level=(c.level||1)+1;c.pop=Math.round(c.pop*1.10);c.income=(c.income||0)+420000;c.happiness=Math.min(100,(c.happiness||65)+1);n.cityLevel=Math.max(n.cityLevel||1,c.level);n.happiness=Math.min(100,n.happiness+1);n.xp+=Math.round(cost/18000);n.history.unshift(`${c.name} reached City Level ${c.level}.`);ensureCityVariants(n);save();toast(`${c.name} grew into a larger city`);renderGame();}
 function buildCost(def,c){return Math.round(def.cost*Math.pow(1.14,(c.buildings||[]).filter(x=>x.id===def.id).length));}
-const LOTS=[[-3.1,-3.0],[-1.1,-3.0],[1.1,-3.0],[3.1,-3.0],[-3.1,-1.0],[-1.1,-1.0],[1.1,-1.0],[3.1,-1.0],[-3.1,1.0],[-1.1,1.0],[1.1,1.0],[3.1,1.0],[-3.1,3.0],[-1.1,3.0],[1.1,3.0],[3.1,3.0]];
+const LOTS=[[-2.65,-2.65],[-1.55,-2.65],[-2.65,-1.55],[-1.55,-1.55],[1.55,-2.65],[2.65,-2.65],[1.55,-1.55],[2.65,-1.55],[-2.65,1.55],[-1.55,1.55],[-2.65,2.65],[-1.55,2.65],[1.55,1.55],[2.65,1.55],[1.55,2.65],[2.65,2.65]];
 function buildInCity(id){const n=state.nation,c=selectedCity(),def=BUILD_DEFS.find(x=>x.id===id);if(!def)return;const cost=buildCost(def,c);if(!Number.isFinite(cost)||cost<0)return toast('This building cost could not be calculated.');if(n.money<cost)return toast(`You need ${money(cost)} for ${def.name}.`);if((c.level||1)<(def.cat==='Civic'&&id==='university'?4:def.cat==='Infrastructure'?2:1))return toast('Grow the city further to unlock this.');const used=new Set((c.buildings||[]).map(x=>x.slot));const slot=LOTS.findIndex((_,i)=>!used.has(i));if(slot<0)return toast('All planned lots are occupied. Upgrade the city to unlock more land.');n.money=Math.max(0,Math.round(n.money-cost));c.buildings=c.buildings||[];c.buildings.push({id,slot,level:1});c.income=(c.income||0)+(def.income||0);c.happiness=clamp((c.happiness||65)+(def.happy||0),0,100);c.pop=Math.round((c.pop||0)+(def.pop||0)*.1);n.xp+=Math.round(cost/18000)+35;if(def.cat==='Nature')c.zones.park++;if(def.cat==='Residential')c.zones.residential++;if(def.cat==='Commercial')c.zones.commercial++;if(def.cat==='Industrial')c.zones.industrial++;n.history.unshift(`${def.name} was built in ${c.name}.`);save();toast(`${def.icon} ${def.name} opened in ${c.name}`);renderGame();}
 function addRoadToCity(){const n=state.nation,c=selectedCity(),cost=Math.round(260000*Math.pow(1.12,Math.max(0,c.roads||2)-2));if(n.money<cost)return toast(`You need ${money(cost)} for a new road.`);if((c.roads||2)>=10+(c.level||1)*2)return toast('The current road network is already extensive.');n.money-=cost;c.roads=(c.roads||2)+1;c.income=(c.income||0)+18000;c.happiness=clamp((c.happiness||65)+.25,0,100);n.xp+=45;n.history.unshift(`A new road opened in ${c.name}.`);save();toast('🛣️ Road extended');renderGame();}
 function zoneCity(id){const c=selectedCity();c.zones=c.zones||{};c.zones[id]=(c.zones[id]||0)+1;c.happiness=clamp((c.happiness||65)+(id==='park'?1:.15),0,100);save();toast(`${ZONE_DEFS.find(z=>z.id===id)?.icon||'◈'} ${ZONE_DEFS.find(z=>z.id===id)?.name||id} land reserved`);renderGame();}
@@ -708,14 +708,25 @@ function addKenneyCityAssets(group,seed,level,opts={}){
     });
     if(lvl>=5&&towers.length)placeInBlock(skyline,towers,Math.min(2,1+Math.floor(lvl/5)),commercialBlock,{min:.5,max:.66},1.05);
 
-    // Mini Characters remain untouched in this step; their existing city behavior
-    // is preserved while the road/block geometry is corrected around them.
+    // Citizens belong on the street network, not in the middle of blocks.
+    // They move continuously along the three horizontal or three vertical road lines.
     const people=new THREE.Group();people.name='Citizens';district.add(people);
     const count=Math.min(24,4+Math.floor(Math.sqrt(Math.max(1,opts.population||0)/50000))+lvl*2);
     for(let i=0;i<count;i++){
-      const p=cloneKenney(citizens[Math.floor(rng()*citizens.length)]);p.scale.setScalar(.22+rng()*.055);
-      const angle=rng()*Math.PI*2,rad=1.1+rng()*5.1;p.position.set(Math.cos(angle)*rad,.03,Math.sin(angle)*rad);p.rotation.y=rng()*Math.PI*2;
-      p.userData.walkPhase=rng()*Math.PI*2;p.userData.walkRadius=rad;p.userData.walkSpeed=.00015+rng()*.00012;people.add(p);
+      const p=cloneKenney(citizens[Math.floor(rng()*citizens.length)]);
+      p.scale.setScalar(.115+rng()*.025);
+      const horizontal=rng()<.5;
+      const line=roadLines[Math.floor(rng()*roadLines.length)];
+      const startPos=-5.0+rng()*10.0;
+      p.position.set(horizontal?startPos:line,.035,horizontal?line:startPos);
+      p.rotation.y=horizontal?(rng()<.5?0:Math.PI):(rng()<.5?Math.PI/2:-Math.PI/2);
+      p.userData.walkAxis=horizontal?'x':'z';
+      p.userData.walkDir=rng()<.5?-1:1;
+      p.userData.walkLine=line;
+      p.userData.walkSpeed=.32+rng()*.16;
+      p.userData.walkMin=-5.05;
+      p.userData.walkMax=5.05;
+      people.add(p);
     }
   }).catch(err=>console.warn('Local Kenney assets failed to load',err));
 }
@@ -742,7 +753,7 @@ function addBuiltStructures(group,c){
      const def=BUILD_DEFS.find(x=>x.id===b.id),urls=map[b.id];if(!def||!urls?.length)return;
      const url=urls[idx%urls.length],src=kenneyCache.get(url);if(!src)return;
      const lot=LOTS[b.slot%LOTS.length],g=cloneKenney(src);g.position.set(lot[0],.04,lot[1]);g.rotation.y=(idx%4)*Math.PI/2;
-     const scale=b.id==='cottage'?.62:b.id==='apartment'?.52:b.id==='stadium'?.42:.55;g.scale.setScalar(scale);g.userData.buildingId=b.id;root.add(g);
+     const scale=b.id==='cottage'?.42:b.id==='apartment'?.38:b.id==='stadium'?.30:.40;g.scale.setScalar(scale);g.userData.buildingId=b.id;root.add(g);
    });
  }).catch(()=>{});
 }
@@ -779,7 +790,6 @@ function buildCityScene(host,c,opts={}){
   addKenneyCityAssets(group,seed,lvl,{radius:6.4});
   addBuiltStructures(group,c);
   addCozyProjectVisuals(group,c);
-  addAmbientCitizens(group,c);
   let dragging=false,lastX=0,lastY=0;renderer.domElement.style.touchAction='none';renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;renderer.domElement.setPointerCapture?.(e.pointerId)});renderer.domElement.addEventListener('pointerup',e=>{dragging=false;renderer.domElement.releasePointerCapture?.(e.pointerId)});renderer.domElement.addEventListener('pointercancel',()=>dragging=false);renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;group.rotation.y+=(e.clientX-lastX)*.008;group.rotation.x=THREE.MathUtils.clamp(group.rotation.x+(e.clientY-lastY)*.004,-.35,.25);lastX=e.clientX;lastY=e.clientY});
   const rec={renderer,scene,camera,group,host};citySceneRecords.push(rec);return rec;
 }
@@ -858,7 +868,6 @@ function buildNationalScene(host){
     // The national map uses the same bundled Kenney vocabulary as the city view.
     // Cities are placed inside their own footprints so national infrastructure can live outside them.
     addKenneyCityAssets(cityGroup,c.citySeed||citySeed(c),cLvl,{radius:3.1});
-    addAmbientCitizens(cityGroup,c);
     cityGroup.scale.setScalar(.42+Math.min(cLvl,8)*.018);
     world.add(cityGroup);
     // city glow/marker
@@ -897,7 +906,7 @@ function buildNationalScene(host){
   const rec={renderer,scene,camera,group:world,host};
   citySceneRecords.push(rec); return rec;
 }
-function initCityScenes(){disposeCityScenes();if(!state.nation)return;const hosts=$$('[data-city-scene]');const primary=hosts.slice(0,2);primary.forEach(host=>{const name=host.dataset.cityScene;const c=state.nation.cities.find(x=>x.name===name);if(c)buildCityScene(host,c)});const nationHost=$('#nation-city-scene');if(nationHost){buildNationalScene(nationHost);}const animate=()=>{if(!citySceneRecords.length)return;citySceneRecords.forEach(r=>{if(r.group&&r.host.offsetWidth>0&&r.host.offsetHeight>0){r.group.rotation.y+=.0007;r.group.traverse(o=>{if(o.name==='Citizens'){o.children.forEach(p=>{if(!p.userData.walkRadius)return;const t=performance.now()*p.userData.walkSpeed+p.userData.walkPhase;p.position.set(Math.cos(t)*p.userData.walkRadius*.72,.015,Math.sin(t)*p.userData.walkRadius*.52);p.rotation.y=-t+Math.PI/2;});}});r.renderer.render(r.scene,r.camera)}});window.__cityFrame=requestAnimationFrame(animate)};cancelAnimationFrame(window.__cityFrame);window.__cityFrame=requestAnimationFrame(animate)}
+function initCityScenes(){disposeCityScenes();if(!state.nation)return;const hosts=$$('[data-city-scene]');const primary=hosts.slice(0,2);primary.forEach(host=>{const name=host.dataset.cityScene;const c=state.nation.cities.find(x=>x.name===name);if(c)buildCityScene(host,c)});const nationHost=$('#nation-city-scene');if(nationHost){buildNationalScene(nationHost);}const animate=()=>{if(!citySceneRecords.length)return;citySceneRecords.forEach(r=>{if(r.group&&r.host.offsetWidth>0&&r.host.offsetHeight>0){r.group.rotation.y+=.0007;r.group.traverse(o=>{if(o.name==='Citizens'){const dt=.016;o.children.forEach(p=>{const u=p.userData;if(!u.walkAxis)return;const axis=u.walkAxis==='x'?'x':'z';p.position[axis]+=u.walkSpeed*u.walkDir*dt;if(p.position[axis]>u.walkMax||p.position[axis]<u.walkMin){u.walkDir*=-1;p.position[axis]=THREE.MathUtils.clamp(p.position[axis],u.walkMin,u.walkMax);p.rotation.y=u.walkAxis==='x'?(u.walkDir>0?0:Math.PI):(u.walkDir>0?Math.PI/2:-Math.PI/2);}});}});r.renderer.render(r.scene,r.camera)}});window.__cityFrame=requestAnimationFrame(animate)};cancelAnimationFrame(window.__cityFrame);window.__cityFrame=requestAnimationFrame(animate)}
 function renderGame(){tick();disposeHeroScene();const root=$('#app');let body=home();if(state.screen==='skills')body=fullSkills();else if(['store','development','buildings'].includes(state.screen))body=fullStore();else if(state.screen==='cities')body=fullCities();else if(state.screen==='citybuilder')body=cityBuilder();else if(['statistics','progress'].includes(state.screen))body=fullProgress();else if(state.screen==='map')body=fullMap();else if(state.screen==='history')body=fullHistory();else if(state.screen==='settings')body=fullSettings();else if(state.screen==='diplomacy')body=placeholder('Global Standing','Diplomacy and relations.');root.innerHTML=`<div class="game ${state.ui?.sidebarCollapsed?'sidebar-collapsed':''}"><div class="sidebarwrap">${sidebar()}</div><div class="gamearea">${topbar()}${mobileStatus()}${body}</div></div>${state.toast?`<div class="toast">${esc(state.toast)}</div>`:''}`;requestAnimationFrame(()=>{initHeroScene();initCityScenes()});}
 
 let landingRenderer,landingScene,landingCamera,landingGlobe,landingFrame;
