@@ -5,7 +5,7 @@ import { loadState, saveState as persistState, clearSaves, SAVE_VERSION } from '
 import { internalDate, dayKey, advanceDay } from './game/calendar.js';
 import { nationalBuildingEffects, cityPopulationCapacity, cityJobs } from './game/economy.js';
 
-const GAME_VERSION='2.15.0.3';
+const GAME_VERSION='2.15.0.4';
 const $=(s,r=document)=>r.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const fmt=n=>new Intl.NumberFormat('en-US',{maximumFractionDigits:1}).format(n);
@@ -812,6 +812,7 @@ function buildCityScene(host,c,opts={}){
   const ground=new THREE.Mesh(new THREE.PlaneGeometry(22,18),new THREE.MeshStandardMaterial({color:style.ground,roughness:1}));ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;group.add(ground);
   const lvl=Math.max(1,Math.min(10,c.level||1)),seed=c.citySeed||citySeed(c);
   addKenneyCityAssets(group,seed,lvl,{radius:6.4});
+  addKenneyCityPeople(group,c,lvl);
   addBuiltStructures(group,c);
   addCozyProjectVisuals(group,c);
   addAmbientCitizens(group,c);
@@ -853,56 +854,116 @@ function nationalDevelopmentScore(n){
 }
 function addNationalAssetVisuals(world,n,cities,positions){
   const assets=n.assets||{};
-  const mat=(color,rough=.72,metal=0)=>new THREE.MeshStandardMaterial({color,roughness:rough,metalness:metal});
-  const addBox=(g,w,h,d,color,x,y,z,rough=.72)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat(color,rough));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;g.add(m);return m;};
+  const rng=seeded(hashCity(`${n.name}:national-assets`));
+  const fallbackMat=(color,rough=.72,metal=0)=>new THREE.MeshStandardMaterial({color,roughness:rough,metalness:metal});
+  const addBox=(g,w,h,d,color,x,y,z,rough=.72)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),fallbackMat(color,rough));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;g.add(m);return m;};
   const addTower=(g,x,z,h,color,scale=1)=>{const m=addBox(g,.42*scale,h*scale,.42*scale,color,x,(h*scale)/2+.06,z,.45);for(let y=.28;y<h;y+=.28)addBox(g,.14*scale,.07*scale,.025*scale,0xd6d5bc,x,y*scale,z+.22*scale,.4);return m;};
-  const place=(type,count,cityOffset=0)=>{
-    for(let i=0;i<count;i++){
-      // National landmarks deliberately live OUTSIDE the compact city footprint.
-      // This makes every Store purchase visibly readable on the national map.
-      const cityIndex=cities.length?((i+cityOffset)%cities.length):0;
-      const [cx,cz]=positions[cityIndex]||[0,0];
-      const angle=(hashCity(`${n.name}:national-landmark:${type}:${i}`)%360)*Math.PI/180;
-      const radius=4.1+(i%3)*.72;
-      const x=Math.max(-11.2,Math.min(11.2,cx+Math.cos(angle)*radius));
-      const z=Math.max(-8.0,Math.min(8.0,cz+Math.sin(angle)*radius*.72));
-      const g=new THREE.Group();g.position.set(0,.05,0);g.name=`National Landmark: ${type} ${i+1}`;world.add(g);
-      const s=1.35+Math.min(2,count)*.12;
-      // Landmark plot/base makes the purchase readable even when surrounded by a developed country.
-      addBox(g,2.25*s,.045,1.75*s,0x27383c,x,.075,z,.96);
-      if(type==='factory'){
-        addBox(g,1.25*s,.78*s,.92*s,0x7f7770,x,.47*s,z);addBox(g,.92*s,.12*s,.68*s,0x59666a,x,.91*s,z);
-        addBox(g,.17*s,.92*s,.17*s,0x806c61,x+.42*s,.51*s,z-.22*s,.65);
-      }else if(type==='university'){
-        addBox(g,1.45*s,.64*s,1.05*s,0xc8c4b2,x,.38*s,z);const dome=new THREE.Mesh(new THREE.SphereGeometry(.34*s,16,10,0,Math.PI*2,0,Math.PI/2),mat(0x688894,.55));dome.position.set(x,.98*s,z);g.add(dome);
-        addBox(g,.22*s,.35*s,.22*s,0x8e816c,x,.56*s,z-.66*s);
-      }else if(type==='railway'){
-        addBox(g,1.75*s,.28*s,.78*s,0xb9b4a4,x,.22*s,z);addBox(g,1.5*s,.09*s,.98*s,0x5d7882,x,.55*s,z,.55);
-        addBox(g,2.05*s,.045*s,.055*s,0x9c8769,x,.075,z-.56*s,.8);addBox(g,2.05*s,.045*s,.055*s,0x9c8769,x,.075,z+.56*s,.8);
-      }else if(type==='airport'){
-        addBox(g,3.0*s,.035*s,.72*s,0x2c3438,x,.09,z,.95);addBox(g,.64*s,.085*s,1.25*s,0xd8d0bf,x,.16*s,z,.8);
-        addBox(g,.08*s,.025*s,.58*s,0xe5c36a,x,.22*s,z-.52*s,.7);
-        addBox(g,1.2*s,.08*s,.18*s,0x718a92,x,.18*s,z+.25*s,.65);
-      }else if(type==='hospital'){
-        addBox(g,1.35*s,.72*s,.98*s,0xd9dedb,x,.43*s,z);addBox(g,.58*s,.20*s,.04*s,0xc85858,x,.83*s,z+.51*s,.55);addBox(g,.07*s,.42*s,.04*s,0xc85858,x,.83*s,z+.54*s,.5);
-      }else if(type==='stadium'){
-        const ring=new THREE.Mesh(new THREE.TorusGeometry(.78*s,.19*s,12,32),mat(0x778d9b,.6));ring.rotation.x=Math.PI/2;ring.position.set(x,.34*s,z);g.add(ring);addBox(g,1.22*s,.14*s,.86*s,0x718a62,x,.17*s,z,1);
-      }else if(type==='research'){
-        addTower(g,x-.42*s,z,1.65,0x657f88,s);addTower(g,x+.42*s,z+.08*s,1.25,0x8c7771,s);addBox(g,1.15*s,.10*s,.66*s,0x596d75,x,.10*s,z+.32*s,.55);
-      }else if(type==='finance'){
-        addTower(g,x,z,2.25,0x708b96,s);addTower(g,x+.55*s,z+.08*s,1.5,0x8c7771,s);addBox(g,1.18*s,.08*s,.82*s,0x596d75,x,.10*s,z,.55);
-      }
-      // A short access road connects the landmark to its city's real road network.
-      const roadMat=new THREE.MeshStandardMaterial({color:0x27383c,roughness:.94});
-      const access=new THREE.CatmullRomCurve3([
-        new THREE.Vector3(cx,.045,cz),
-        new THREE.Vector3((cx+x)/2,.045,(cz+z)/2),
-        new THREE.Vector3(x,.045,z)
-      ]);
-      g.add(new THREE.Mesh(new THREE.TubeGeometry(access,18,.045,5,false),roadMat));
-    }
+  const fallback=(type,x,z,count)=>{
+    const g=new THREE.Group();g.position.y=.06;g.name=`National Landmark: ${type}`;world.add(g);
+    const s=1.15+Math.min(2,count)*.1;
+    addBox(g,2.4*s,.045,2*s,0x27383c,x,.075,z,.96);
+    if(type==='factory'){addBox(g,1.3*s,.82*s,.95*s,0x7f7770,x,.47*s,z);addBox(g,.18*s,1.0*s,.18*s,0x806c61,x+.45*s,.55*s,z-.2*s,.65);}
+    else if(type==='university'){addBox(g,1.5*s,.66*s,1.05*s,0xc8c4b2,x,.38*s,z);const dome=new THREE.Mesh(new THREE.SphereGeometry(.34*s,16,10,0,Math.PI*2,0,Math.PI/2),fallbackMat(0x688894,.55));dome.position.set(x,.98*s,z);g.add(dome);}
+    else if(type==='airport'){addBox(g,3*s,.035*s,.72*s,0x2c3438,x,.09,z,.95);addBox(g,.64*s,.085*s,1.25*s,0xd8d0bf,x,.16*s,z,.8);}
+    else if(type==='railway'){addBox(g,1.75*s,.28*s,.78*s,0xb9b4a4,x,.22*s,z);addBox(g,2.05*s,.045*s,.055*s,0x9c8769,x,.075,z-.56*s,.8);addBox(g,2.05*s,.045*s,.055*s,0x9c8769,x,.075,z+.56*s,.8);}
+    else if(type==='hospital'){addBox(g,1.35*s,.72*s,.98*s,0xd9dedb,x,.43*s,z);addBox(g,.58*s,.2*s,.04*s,0xc85858,x,.83*s,z+.51*s,.55);}
+    else if(type==='stadium'){const ring=new THREE.Mesh(new THREE.TorusGeometry(.78*s,.19*s,12,32),fallbackMat(0x778d9b,.6));ring.rotation.x=Math.PI/2;ring.position.set(x,.34*s,z);g.add(ring);}
+    else if(type==='research'){addTower(g,x-.42*s,z,1.65,0x657f88,s);addTower(g,x+.42*s,z+.08*s,1.25,0x8c7771,s);}
+    else if(type==='finance'){addTower(g,x,z,2.25,0x708b96,s);addTower(g,x+.55*s,z+.08*s,1.5,0x8c7771,s);}
   };
-  for(const d of storeDefs) place(d.id,Math.min(12,Number(assets[d.id])||0));
+
+  // Reserve the outer perimeter for national infrastructure. City footprints never occupy this ring.
+  const anchors=[];
+  const candidates=[[-11,-7],[-6,-8],[0,-8],[6,-8],[11,-6],[-11,0],[11,0],[-10,6],[-4,8],[3,8],[10,6]];
+  for(const [x,z] of candidates){
+    if(positions.some(([cx,cz])=>Math.hypot(cx-x,cz-z)<3.5))continue;
+    if(anchors.some(([ax,az])=>Math.hypot(ax-x,az-z)<2.7))continue;
+    anchors.push([x,z]);
+  }
+  const occupied=[];
+  const getPlot=(index)=>{
+    for(let pass=0;pass<2;pass++){
+      for(let k=0;k<candidates.length;k++){
+        const [x,z]=candidates[(index+k+pass*5)%candidates.length];
+        if(positions.some(([cx,cz])=>Math.hypot(cx-x,cz-z)<3.3))continue;
+        if(occupied.some(([ox,oz])=>Math.hypot(ox-x,oz-z)<2.5))continue;
+        occupied.push([x,z]);return [x,z];
+      }
+    }
+    const a=index*2.399963;return [Math.cos(a)*11,Math.sin(a)*7];
+  };
+
+  const modelSpec={
+    factory:{packs:['City Kit (Industrial)'],patterns:[/factory|warehouse|industrial|building-[a-z]/i]},
+    university:{packs:['City Kit (Commercial)'],patterns:[/building-[a-z]|skyscraper/i]},
+    railway:{packs:['City Kit (Commercial)'],patterns:[/building-[a-z]|station|road/i]},
+    airport:{packs:['City Kit (Commercial)'],patterns:[/building-[a-z]|terminal|hangar/i]},
+    hospital:{packs:['City Kit (Commercial)'],patterns:[/building-[a-z]/i]},
+    stadium:{packs:['City Kit (Commercial)'],patterns:[/building-[a-z]/i]},
+    research:{packs:['City Kit (Industrial)','City Kit (Commercial)'],patterns:[/building-[a-z]|industrial|skyscraper/i]},
+    finance:{packs:['City Kit (Commercial)'],patterns:[/skyscraper|building-[a-z]/i]}
+  };
+  const allPromise=getKenneyCatalog().then(cat=>Array.isArray(cat)?cat:(cat.models||cat.assets||[]));
+  allPromise.then(all=>{
+    const bySpec=(spec)=>{
+      for(const pack of spec.packs){
+        const list=all.filter(x=>{
+          const p=String(x.pack||x.category||x.collection||'');
+          const f=String(x.file||x.path||x.url||'');
+          return (p.toLowerCase()===pack.toLowerCase() || f.toLowerCase().includes(pack.toLowerCase().replaceAll(' ','-')))&&spec.patterns.some(rx=>rx.test(f));
+        }).map(kenneyUrl).filter(Boolean);
+        if(list.length)return list.slice(0,18);
+      }
+      return [];
+    };
+    const jobs=[];
+    for(const d of storeDefs){
+      const count=Math.min(8,Math.max(0,Number(assets[d.id])||0)); if(!count)continue;
+      const spec=modelSpec[d.id]||modelSpec.finance;
+      const urls=bySpec(spec);
+      for(let i=0;i<count;i++){
+        const [x,z]=getPlot(occupied.length);
+        jobs.push((async()=>{
+          let src=null;
+          if(urls.length){
+            try{src=await loadKenney(urls[Math.floor(rng()*urls.length)]);}catch{}
+          }
+          if(src){
+            const g=new THREE.Group();g.name=`National Kenney Asset: ${d.id} ${i+1}`;world.add(g);
+            const base=new THREE.Mesh(new THREE.BoxGeometry(2.25,.045,1.85),fallbackMat(0x27383c,.96));base.position.set(x,.075,z);base.receiveShadow=true;world.add(base);
+            const model=cloneKenney(src);model.scale.setScalar(1.15+(count*.035));model.position.set(x,.10,z);model.rotation.y=(hashCity(`${n.name}:${d.id}:${i}`)%360)*Math.PI/180;g.add(model);
+            // Access lane visually connects the national landmark to the country network without entering the city footprint.
+            const nearest=positions.reduce((best,p)=>!best||Math.hypot(p[0]-x,p[1]-z)<Math.hypot(best[0]-x,best[1]-z)?p:best,null);
+            if(nearest){const roadMat=new THREE.MeshStandardMaterial({color:0x27383c,roughness:.94});const curve=new THREE.CatmullRomCurve3([new THREE.Vector3(x,.045,z),new THREE.Vector3((x+nearest[0])/2,.045,(z+nearest[1])/2),new THREE.Vector3(nearest[0],.045,nearest[1])]);g.add(new THREE.Mesh(new THREE.TubeGeometry(curve,18,.045,5,false),roadMat));}
+          }else fallback(d.id,x,z,count);
+        })());
+      }
+    }
+    return Promise.all(jobs);
+  }).catch(()=>{});
+}
+
+function addKenneyCityPeople(group,city,level){
+  const rng=seeded(hashCity(`${city.name}:people:${city.level||level}`));
+  getKenneyCatalog().then(cat=>{
+    const all=Array.isArray(cat)?cat:(cat.models||cat.assets||[]);
+    const people=all.filter(x=>{
+      const p=String(x.pack||x.category||x.collection||'');
+      const f=String(x.file||x.path||x.url||'');
+      return (p.toLowerCase().includes('mini characters')||f.toLowerCase().includes('mini-characters')) && /character|person|people|citizen/i.test(f);
+    }).map(kenneyUrl).filter(Boolean).slice(0,12);
+    if(!people.length)return;
+    Promise.all(people.map(loadKenney)).then(models=>{
+      const crowd=new THREE.Group();crowd.name='Kenney Mini Citizens';group.add(crowd);
+      const count=Math.min(28,5+Math.floor((city.level||level)*2));
+      for(let i=0;i<count;i++){
+        const src=models[Math.floor(rng()*models.length)],person=cloneKenney(src);
+        const a=rng()*Math.PI*2,r=1.0+rng()*2.7;
+        person.position.set(Math.cos(a)*r,.055,Math.sin(a)*r*.72);
+        person.scale.setScalar(.18+rng()*.08);person.rotation.y=rng()*Math.PI*2;crowd.add(person);
+      }
+    }).catch(()=>{});
+  }).catch(()=>{});
 }
 
 function addNationalRoadDevelopment(world,n,cities,positions,route){
