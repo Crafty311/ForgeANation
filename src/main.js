@@ -656,12 +656,12 @@ function addKenneyCityAssets(group,seed,level,opts={}){
     const straight=roads[0],cross=roads[2]||straight;
     for(const z of roadLines){
       for(let x=roadMin;x<=roadMax;x+=1){
-        const r=cloneKenney(straight);r.position.set(x,.02,z);rg.add(r);
+        const r=cloneKenney(straight);r.position.set(x,.02,z);r.rotation.y=Math.PI/2;rg.add(r);
       }
     }
     for(const x of roadLines){
       for(let z=roadMin;z<=roadMax;z+=1){
-        const r=cloneKenney(straight);r.position.set(x,.021,z);r.rotation.y=Math.PI/2;rg.add(r);
+        const r=cloneKenney(straight);r.position.set(x,.021,z);r.rotation.y=0;rg.add(r);
       }
     }
     for(const x of roadLines)for(const z of roadLines){
