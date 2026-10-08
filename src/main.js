@@ -603,7 +603,25 @@ function loadKenney(url){
   const promise=new Promise((resolve,reject)=>kenneyLoader.load(url,g=>resolve(g.scene),undefined,reject));
   kenneyCache.set(url,promise); return promise;
 }
-function cloneKenney(src){const x=src.clone(true);x.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});return x;}
+function cloneKenney(src,opts={}){
+  const x=src.clone(true);
+  x.traverse(o=>{
+    if(o.isMesh){
+      o.castShadow=true;o.receiveShadow=true;
+      if(o.material){
+        const mats=Array.isArray(o.material)?o.material:[o.material];
+        mats.forEach(m=>{if(m){m.transparent=false;m.opacity=1;m.depthWrite=true;m.needsUpdate=true;}});
+      }
+    }
+  });
+  // Kenney models use their own colormap and correct model-space ground plane.
+  // Re-ground the whole clone so no imported pivot/offset can float above the map.
+  if(opts.ground!==false){
+    const box=new THREE.Box3().setFromObject(x);
+    if(Number.isFinite(box.min.y)) x.position.y-=box.min.y;
+  }
+  return x;
+}
 function seeded(seed){let x=(seed>>>0)||1;return()=>{x=(Math.imul(1664525,x)+1013904223)>>>0;return x/4294967296};}
 function loadAssetSet(urls){return Promise.all(urls.map(loadKenney));}
 function placeSpacedKenney(group,models,rng,count,zone,scaleRange={min:.7,max:1.05},minGap=.8,y=.045){
@@ -670,26 +688,10 @@ function addKenneyCityAssets(group,seed,level,opts={}){
 }
 
 function addCozyProjectVisuals(group,c){
-  const projects=c.cozy?.projects||[]; if(!projects.length)return;
-  const mat=(color,rough=.8)=>new THREE.MeshStandardMaterial({color,roughness:rough});
-  projects.slice(-8).forEach((p,i)=>{
-    const id=p.id, x=-4.4+(i%4)*2.8, z=3.4+Math.floor(i/4)*1.5;
-    const g=new THREE.Group();g.position.set(x,.06,z);group.add(g);
-    if(id==='park'||id==='playground'||id==='clean'||id==='street'){
-      const base=new THREE.Mesh(new THREE.BoxGeometry(1.35,.035,1.0),mat(id==='park'?0x5d855d:0x8b8b68,1));base.position.y=.02;g.add(base);
-      for(let t=0;t<3;t++){const tr=new THREE.Mesh(new THREE.CylinderGeometry(.035,.045,.28,6),mat(0x684e39,1));tr.position.set(-.42+t*.42,.18,.18);g.add(tr);const crown=new THREE.Mesh(new THREE.SphereGeometry(.18,7,6),mat([0x4f7b55,0x648d5e,0x47714f][t],1));crown.position.set(tr.position.x,.40,.18);g.add(crown);}
-      if(id==='playground'){const post=mat(0xd7a24c,1);for(const px of [-.35,.35]){const pole=new THREE.Mesh(new THREE.CylinderGeometry(.025,.025,.28,6),post);pole.position.set(px,.18,-.2);g.add(pole)}const bar=new THREE.Mesh(new THREE.BoxGeometry(.8,.035,.035),post);bar.position.set(0,.31,-.2);g.add(bar)}
-    } else if(id==='market'||id==='cafe'||id==='library'){
-      const body=new THREE.Mesh(new THREE.BoxGeometry(1.0,.55,.72),mat(id==='cafe'?0xc58b63:id==='library'?0x9b7f67:0xc4aa68,.72));body.position.y=.30;g.add(body);
-      const roof=new THREE.Mesh(new THREE.ConeGeometry(.72,.22,4),mat(id==='market'?0x9b5b52:0x596e73,.8));roof.position.y=.72;roof.rotation.y=Math.PI/4;g.add(roof);
-      if(id==='cafe'){const awning=new THREE.Mesh(new THREE.BoxGeometry(.72,.08,.18),mat(0xe1c477,.5));awning.position.set(0,.46,.42);g.add(awning)}
-      if(id==='library'){for(let j=-1;j<=1;j++){const w=new THREE.Mesh(new THREE.BoxGeometry(.12,.14,.025),mat(0xe2d6a7,.5));w.position.set(j*.2,.34,.37);g.add(w)}}
-    } else if(id==='festival'){
-      const pole=new THREE.Mesh(new THREE.CylinderGeometry(.018,.018,.75,5),mat(0x6d5944,1));pole.position.y=.38;g.add(pole);
-      for(let k=0;k<5;k++){const bulb=new THREE.Mesh(new THREE.SphereGeometry(.045,6,5),new THREE.MeshBasicMaterial({color:k%2?0xe6c96d:0x9bd7d3}));bulb.position.set(-.65+k*.32,.70,.05);g.add(bulb)}
-    }
-  });
+  // Retired: the old procedural boxes conflicted with the Kenney visual language.
+  // Existing projects remain represented by the real Kenney city districts below.
 }
+
 function addBuiltStructures(group,c){
  const buildings=c.buildings||[];if(!buildings.length)return;
  const root=new THREE.Group();root.name='Player Built District';group.add(root);
@@ -713,16 +715,25 @@ function addBuiltStructures(group,c){
  }).catch(()=>{});
 }
 function addAmbientCitizens(group,c){
-  const rng=seeded(hashCity(`${c.name}:citizens`)),people=new THREE.Group();people.name='Ambient Citizens';group.add(people);
+  const rng=seeded(hashCity(`${c.name}:citizens`));
+  const people=new THREE.Group();people.name='Citizens';group.add(people);
   loadAssetSet(LOCAL_ASSETS.citizens).then(models=>{
-    const count=Math.min(12,3+Math.floor(Math.sqrt(Math.max(1,c.pop||0)/70000)));
+    const count=Math.min(18,5+Math.floor(Math.sqrt(Math.max(1,c.pop||0)/50000)));
     for(let i=0;i<count;i++){
-      const p=cloneKenney(models[Math.floor(rng()*models.length)]);p.scale.setScalar(.20+rng()*.045);
-      p.position.set((rng()-.5)*9,.03,(rng()-.5)*9);p.rotation.y=rng()*Math.PI*2;p.userData.phase=rng()*Math.PI*2;p.userData.speed=.00018+rng()*.00012;people.add(p);
+      const p=cloneKenney(models[Math.floor(rng()*models.length)]);
+      const s=.24+rng()*.055;p.scale.setScalar(s);
+      const angle=rng()*Math.PI*2,rad=1.0+rng()*5.0;
+      p.position.set(Math.cos(angle)*rad,.015,Math.sin(angle)*rad*.72);
+      p.rotation.y=rng()*Math.PI*2;
+      p.userData.walkPhase=rng()*Math.PI*2;
+      p.userData.walkRadius=rad;
+      p.userData.walkSpeed=.00014+rng()*.00012;
+      people.add(p);
     }
-  }).catch(()=>{});
-  people.userData.citizens=true;
+  }).catch(err=>console.warn('Citizen assets failed to load',err));
+  return people;
 }
+
 function buildCityScene(host,c,opts={}){
   if(!host||!c)return null;
   const width=host.clientWidth||640,height=host.clientHeight||320;
@@ -737,9 +748,6 @@ function buildCityScene(host,c,opts={}){
   addBuiltStructures(group,c);
   addCozyProjectVisuals(group,c);
   addAmbientCitizens(group,c);
-  // Sparse civic progression that does not use the retired placeholder building/tree library.
-  if(lvl>=4){const landmark=new THREE.Mesh(new THREE.BoxGeometry(.65,1.4+lvl*.18,.65),new THREE.MeshStandardMaterial({color:style.accent,metalness:.2,roughness:.45}));landmark.position.set(0,.75+lvl*.09,0);group.add(landmark);}
-  if(lvl>=6){const tower=new THREE.Mesh(new THREE.CylinderGeometry(.14,.24,2.4+lvl*.25,10),new THREE.MeshStandardMaterial({color:0xcbd9de,metalness:.35,roughness:.3}));tower.position.set(1.9,1.25+lvl*.13,-1.8);group.add(tower);}
   let dragging=false,lastX=0,lastY=0;renderer.domElement.style.touchAction='none';renderer.domElement.addEventListener('pointerdown',e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;renderer.domElement.setPointerCapture?.(e.pointerId)});renderer.domElement.addEventListener('pointerup',e=>{dragging=false;renderer.domElement.releasePointerCapture?.(e.pointerId)});renderer.domElement.addEventListener('pointercancel',()=>dragging=false);renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;group.rotation.y+=(e.clientX-lastX)*.008;group.rotation.x=THREE.MathUtils.clamp(group.rotation.x+(e.clientY-lastY)*.004,-.35,.25);lastX=e.clientX;lastY=e.clientY});
   const rec={renderer,scene,camera,group,host};citySceneRecords.push(rec);return rec;
 }
@@ -818,6 +826,7 @@ function buildNationalScene(host){
     // The national map uses the same bundled Kenney vocabulary as the city view.
     // Cities are placed inside their own footprints so national infrastructure can live outside them.
     addKenneyCityAssets(cityGroup,c.citySeed||citySeed(c),cLvl,{radius:3.1});
+    addAmbientCitizens(cityGroup,c);
     cityGroup.scale.setScalar(.42+Math.min(cLvl,8)*.018);
     world.add(cityGroup);
     // city glow/marker
@@ -856,7 +865,7 @@ function buildNationalScene(host){
   const rec={renderer,scene,camera,group:world,host};
   citySceneRecords.push(rec); return rec;
 }
-function initCityScenes(){disposeCityScenes();if(!state.nation)return;const hosts=$$('[data-city-scene]');const primary=hosts.slice(0,2);primary.forEach(host=>{const name=host.dataset.cityScene;const c=state.nation.cities.find(x=>x.name===name);if(c)buildCityScene(host,c)});const nationHost=$('#nation-city-scene');if(nationHost){buildNationalScene(nationHost);}const animate=()=>{if(!citySceneRecords.length)return;citySceneRecords.forEach(r=>{if(r.group&&r.host.offsetWidth>0&&r.host.offsetHeight>0){r.group.rotation.y+=.0007;const people=r.group.getObjectByName('Citizens');if(people){people.children.forEach((p,j)=>{const t=performance.now()*p.userData.speed+p.userData.phase;p.position.set(Math.cos(t)*p.userData.radius*.72,.03,Math.sin(t)*p.userData.radius*.52);p.rotation.y=-t+Math.PI/2;});}r.renderer.render(r.scene,r.camera)}});window.__cityFrame=requestAnimationFrame(animate)};cancelAnimationFrame(window.__cityFrame);window.__cityFrame=requestAnimationFrame(animate)}
+function initCityScenes(){disposeCityScenes();if(!state.nation)return;const hosts=$$('[data-city-scene]');const primary=hosts.slice(0,2);primary.forEach(host=>{const name=host.dataset.cityScene;const c=state.nation.cities.find(x=>x.name===name);if(c)buildCityScene(host,c)});const nationHost=$('#nation-city-scene');if(nationHost){buildNationalScene(nationHost);}const animate=()=>{if(!citySceneRecords.length)return;citySceneRecords.forEach(r=>{if(r.group&&r.host.offsetWidth>0&&r.host.offsetHeight>0){r.group.rotation.y+=.0007;r.group.traverse(o=>{if(o.name==='Citizens'){o.children.forEach(p=>{if(!p.userData.walkRadius)return;const t=performance.now()*p.userData.walkSpeed+p.userData.walkPhase;p.position.set(Math.cos(t)*p.userData.walkRadius*.72,.015,Math.sin(t)*p.userData.walkRadius*.52);p.rotation.y=-t+Math.PI/2;});}});r.renderer.render(r.scene,r.camera)}});window.__cityFrame=requestAnimationFrame(animate)};cancelAnimationFrame(window.__cityFrame);window.__cityFrame=requestAnimationFrame(animate)}
 function renderGame(){tick();disposeHeroScene();const root=$('#app');let body=home();if(state.screen==='skills')body=fullSkills();else if(['store','development','buildings'].includes(state.screen))body=fullStore();else if(state.screen==='cities')body=fullCities();else if(state.screen==='citybuilder')body=cityBuilder();else if(['statistics','progress'].includes(state.screen))body=fullProgress();else if(state.screen==='map')body=fullMap();else if(state.screen==='history')body=fullHistory();else if(state.screen==='settings')body=fullSettings();else if(state.screen==='diplomacy')body=placeholder('Global Standing','Diplomacy and relations.');root.innerHTML=`<div class="game ${state.ui?.sidebarCollapsed?'sidebar-collapsed':''}"><div class="sidebarwrap">${sidebar()}</div><div class="gamearea">${topbar()}${mobileStatus()}${body}</div></div>${state.toast?`<div class="toast">${esc(state.toast)}</div>`:''}`;requestAnimationFrame(()=>{initHeroScene();initCityScenes()});}
 
 let landingRenderer,landingScene,landingCamera,landingGlobe,landingFrame;
